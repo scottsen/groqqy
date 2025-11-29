@@ -13,17 +13,22 @@ Ultra-fast, ultra-cheap, and truly agentic. Groqqy is a multi-step reasoning age
 - 🧩 **Composable**: Mix and match components (Agent, Tools, Memory, etc.)
 - 📚 **Teaching-friendly**: Clean, readable code perfect for learning agentic AI
 
-## What's New in v0.3.0
+## What's New in v2.0.0
 
-**Major Architecture Refactor** - Transformed from single-turn assistant to true micro agentic bot:
+**Strategy Pattern + Platform Tools** - Extensible tool execution architecture:
 
-- ✅ **Agentic Loop**: Multi-step reasoning (think/act/observe pattern)
-- ✅ **Tool Registry**: Dynamic tool registration - add custom tools without code edits
-- ✅ **Composable Components**: ConversationManager, ToolExecutor, CostTracker
-- ✅ **49% Smaller**: Bot.py reduced from 277 → 140 lines
-- ✅ **Extensible**: All components <200 lines, easy to customize
+- ✨ **Strategy Pattern**: Pluggable tool execution (Local/Platform/Hybrid strategies)
+- 🌐 **Web Search**: Browser search via Groq's platform tools (Tavily API)
+- 🔌 **Platform Tools**: Server-side tool execution (browser_search, web_search)
+- 🎯 **Auto-Detection**: Automatically selects appropriate strategy based on tool types
+- 🔄 **Backward Compatible**: Existing code works unchanged
 
 See [CHANGELOG.md](CHANGELOG.md) for full details.
+
+### Previous: v0.3.0 Architecture Refactor
+- ✅ Agentic Loop: Multi-step reasoning (think/act/observe pattern)
+- ✅ Tool Registry: Dynamic tool registration
+- ✅ Composable Components: ConversationManager, ToolExecutor, CostTracker
 
 ## Installation
 
@@ -99,6 +104,61 @@ bot = Groqqy(
 
 response, cost = bot.chat("Analyze the sentiment of README.md")
 ```
+
+### Platform Tools & Web Search (v2.0+)
+
+Groqqy now supports **platform tools** that execute on Groq's servers, starting with **browser_search** for web access:
+
+```python
+from groqqy import Groqqy
+from groqqy.tool import ToolRegistry
+
+# Create registry with platform tool
+registry = ToolRegistry()
+registry.register_platform_tool("browser_search")
+
+# Use a compatible model
+bot = Groqqy(
+    model="openai/gpt-oss-20b",  # Required for platform tools
+    tools=registry
+)
+
+# Ask questions that require web search
+response, cost = bot.chat(
+    "What are the latest developments in AI this week?"
+)
+print(response)  # Gets current information from the web
+```
+
+**Compatible Models for Platform Tools:**
+- `openai/gpt-oss-20b` (recommended)
+- `llama-3.3-70b-versatile`
+- Llama 4 Scout (when available)
+
+**Mix with Local Tools (Hybrid):**
+```python
+from groqqy.tools import read_file, search_files
+
+# Add both platform and local tools
+registry.register_platform_tool("browser_search")
+registry.register_function(read_file)
+registry.register_function(search_files)
+
+bot = Groqqy(model="openai/gpt-oss-20b", tools=registry)
+
+# Agent automatically uses appropriate tools
+response, cost = bot.chat(
+    "Search the web for Python best practices, "
+    "then check if our code follows them"
+)
+# Uses browser_search for web + read_file for local code
+```
+
+**How Platform Tools Work:**
+- Tools execute **server-side** on Groq's infrastructure
+- Results appear directly in the response (no local execution)
+- Strategy Pattern automatically detects and handles tool types
+- See `examples/example_web_search.py` for complete examples
 
 ## Architecture
 
@@ -191,6 +251,7 @@ groqqy/
 ├── __init__.py              # Package exports
 ├── bot.py (140 lines)       # Simple facade over Agent
 ├── agent.py (175 lines)     # Agentic loop (THINK/ACT/OBSERVE)
+├── strategy.py (209 lines)  # Tool execution strategies (v2.0+)
 ├── tool.py (199 lines)      # Tool registry system
 ├── tools.py (77 lines)      # Built-in tools (read, search, run)
 ├── cli.py (141 lines)       # Interactive CLI

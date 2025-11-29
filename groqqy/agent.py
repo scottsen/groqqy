@@ -6,12 +6,13 @@ Enables multi-step reasoning and tool chaining
 """
 
 from dataclasses import dataclass
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 
 from .provider import Provider
 from .tool import ToolRegistry
 from .components import ConversationManager, ToolExecutor, CostTracker
 from .log import get_logger
+from .strategy import ToolExecutionStrategy, detect_strategy
 
 
 @dataclass
@@ -46,7 +47,8 @@ class Agent:
         provider: Provider,
         tools: ToolRegistry,
         max_iterations: int = 10,
-        logger=None
+        logger=None,
+        strategy: Optional[ToolExecutionStrategy] = None
     ):
         """
         Initialize agent.
@@ -56,11 +58,17 @@ class Agent:
             tools: ToolRegistry with available tools
             max_iterations: Maximum agent loop iterations (prevents infinite loops)
             logger: Optional logger
+            strategy: Tool execution strategy (auto-detected if not provided)
         """
         self.provider = provider
         self.tools = tools
         self.max_iterations = max_iterations
         self.log = logger or get_logger("agent")
+
+        # Auto-detect strategy based on tool types
+        self.strategy = strategy or detect_strategy(tools.to_schemas())
+
+        self.log.debug(f"Agent initialized with {self.strategy.describe()}")
 
         # Components (composable!)
         self.conversation = ConversationManager()
@@ -105,20 +113,26 @@ class Agent:
             cost = self.provider.get_cost(response.usage)
             self.tracker.add(cost, {"iteration": iteration})
 
-            # ACT: Execute tools if LLM requested them
-            if response.tool_calls:
-                num_tools = len(response.tool_calls)
+            # ACT: Let strategy decide how to handle response
+            execution_result = self.strategy.handle_response(
+                response,
+                self.tools.to_schemas()
+            )
+
+            if execution_result.needs_continuation:
+                # Strategy says we need to execute tools locally
+                num_tools = len(execution_result.tool_calls)
                 tool_calls_made += num_tools
 
                 self.log.info(f"Executing {num_tools} tool(s)",
                              iteration=iteration,
-                             tools=[tc['function']['name'] for tc in response.tool_calls])
+                             tools=[tc['function']['name'] for tc in execution_result.tool_calls])
 
                 # Add tool calls to conversation
-                self.conversation.add_tool_calls(response.text, response.tool_calls)
+                self.conversation.add_tool_calls(response.text, execution_result.tool_calls)
 
                 # Execute all tools
-                for tool_call in response.tool_calls:
+                for tool_call in execution_result.tool_calls:
                     # OBSERVE: Get tool result
                     result = self.executor.execute(tool_call)
 
@@ -128,7 +142,7 @@ class Agent:
                 # Continue loop - LLM will process tool results
                 continue
 
-            # No tool calls - agent is done thinking
+            # Strategy says we're done (no local execution needed)
             self.conversation.add_assistant(response.text)
 
             self.log.info("Agent run completed",
@@ -137,7 +151,7 @@ class Agent:
                          total_cost=self.tracker.get_total())
 
             return AgentResult(
-                response=response.text,
+                response=execution_result.content or response.text,
                 iterations=iteration,
                 total_cost=self.tracker.get_total(),
                 tool_calls_made=tool_calls_made,

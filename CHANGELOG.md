@@ -5,6 +5,34 @@ All notable changes to Groqqy will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.0] - 2025-11-28
+
+### Added
+- **Strategy Pattern**: ToolExecutionStrategy abstraction for extensible tool execution
+  - `LocalToolStrategy`: Function-based tools (read_file, run_command) execute locally
+  - `PlatformToolStrategy`: Server-executed tools (browser_search, web_search) run on Groq's servers
+  - `HybridToolStrategy`: Mix local + platform tools in same agent
+  - `detect_strategy()`: Auto-detection selects appropriate strategy based on tool types
+- **Platform Tool Support**: Integration with Groq Compound AI System
+  - `registry.register_platform_tool("browser_search")` API
+  - Server-side execution (no local tool_calls, results appear directly in response)
+  - Compatible models: openai/gpt-oss-20b, Llama 4 Scout, Llama 3.3 70B
+- **Web Search Capabilities**: browser_search powered by Tavily API
+- **New Example**: `examples/example_web_search.py` demonstrating platform tools and hybrid usage
+
+### Changed
+- **Agent**: Added optional `strategy` parameter (auto-detected if not provided)
+- **ToolRegistry**: Enhanced `to_schemas()` to merge function and platform tools
+- **Agent Loop**: Delegates response handling to strategy pattern instead of hardcoded logic
+- **Architecture**: Extended via Strategy Pattern (Open/Closed Principle)
+
+### Technical Details
+- `strategy.py`: 209 lines with extensive documentation and teaching focus
+- Backward compatible: Existing code works unchanged without modifications
+- Follows SOLID principles: Open/Closed (extend via new strategies without modifying Agent)
+- Teaching microkernel: Each strategy includes "WHY THIS EXISTS" documentation
+- Auto-detection prevents API complexity for beginners while allowing advanced control
+
 ## [1.0.0] - 2025-11-28
 
 ### Added - v0.3.0 Architecture Refactor

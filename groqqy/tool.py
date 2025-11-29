@@ -67,11 +67,13 @@ class ToolRegistry:
     Registry for managing available tools.
 
     Provides dynamic registration, discovery, and schema generation.
+    Supports both local function-based tools and platform tools.
     """
 
     def __init__(self):
         """Initialize empty registry."""
         self._tools: Dict[str, Tool] = {}
+        self._platform_tools: List[Dict[str, Any]] = []  # Platform tools (e.g., browser_search)
 
     def register(self, tool: Tool):
         """
@@ -92,6 +94,21 @@ class ToolRegistry:
         """
         tool = Tool.from_function(func, description)
         self.register(tool)
+
+    def register_platform_tool(self, tool_type: str):
+        """
+        Register a platform tool (executes on LLM provider's servers).
+
+        Platform tools like browser_search, web_search execute server-side
+        and don't require local function implementations.
+
+        Args:
+            tool_type: Type of platform tool (e.g., "browser_search", "web_search")
+
+        Example:
+            registry.register_platform_tool("browser_search")
+        """
+        self._platform_tools.append({"type": tool_type})
 
     def get(self, name: str) -> Optional[Tool]:
         """
@@ -127,10 +144,14 @@ class ToolRegistry:
         """
         Convert all tools to OpenAI tool schemas.
 
+        Returns both function-based tools and platform tools.
+
         Returns:
             List of tool schemas for LLM API
         """
-        return [tool.to_schema() for tool in self._tools.values()]
+        schemas = [tool.to_schema() for tool in self._tools.values()]
+        schemas.extend(self._platform_tools)
+        return schemas
 
     def __len__(self) -> int:
         """Return number of registered tools."""
