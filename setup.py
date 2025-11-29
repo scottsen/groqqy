@@ -9,7 +9,7 @@ with open("README.md", "r", encoding="utf-8") as f:
 
 setup(
     name="groqqy",
-    version="1.0.0",
+    version="1.0.1",
     author="Scott Sennewald",
     description="Clean, composable micro agentic bot - Teaching kernel for agentic AI",
     long_description=long_description,
