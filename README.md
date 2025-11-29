@@ -28,22 +28,28 @@ See [CHANGELOG.md](CHANGELOG.md) for full details.
 ## Installation
 
 ```bash
-cd ~/src/projects/groqqy
+# Clone the repository
+git clone https://github.com/scottsen/groqqy.git
+cd groqqy
+
+# Install (use virtual environment recommended)
 pip install -e .
 ```
+
+**Note:** Requires Python 3.8+ and a Groq API key (set `GROQ_API_KEY` environment variable).
 
 ## Quick Start
 
 ### Interactive Chat
 
 ```bash
-python -m groqqy.cli
+groqqy
 ```
 
-Or use the convenience script:
+Or using Python module directly:
 
 ```bash
-./groqqy
+python -m groqqy.cli
 ```
 
 ### Programmatic Use
