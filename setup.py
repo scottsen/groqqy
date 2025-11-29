@@ -9,15 +9,17 @@ with open("README.md", "r", encoding="utf-8") as f:
 
 setup(
     name="groqqy",
-    version="0.1.0",
-    author="TIA",
-    description="Simple general-purpose AI assistant powered by Groq",
+    version="1.0.0",
+    author="Scott Sennewald",
+    description="Clean, composable micro agentic bot - Teaching kernel for agentic AI",
     long_description=long_description,
     long_description_content_type="text/markdown",
+    url="https://github.com/scottsen/groqqy",
     packages=find_packages(),
     python_requires=">=3.8",
     install_requires=[
         "requests>=2.31.0",
+        "loguru>=0.7.0",
     ],
     entry_points={
         "console_scripts": [

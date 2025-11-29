@@ -1,16 +1,46 @@
 """
-Groqqy - Simple general-purpose AI assistant powered by Groq
+Groqqy - Micro agentic bot powered by Groq
 
-Fast, cheap, and helpful.
+Fast, cheap, helpful, and extensible.
 """
 
-__version__ = "0.1.0"
+__version__ = "1.0.0"
 
+# Main bot
 from .bot import Groqqy
+
+# Tool system
+from .tool import Tool, ToolRegistry, tool, create_default_registry
+
+# Components (for advanced users)
+from .components import ConversationManager, ToolExecutor, CostTracker
+
+# Agent (for advanced users)
+from .agent import Agent, AgentResult
+
+# Default tools
 from .tools import read_file, run_command, search_files, search_content
 
 __all__ = [
+    # Main API
     "Groqqy",
+
+    # Tool system
+    "Tool",
+    "ToolRegistry",
+    "tool",
+    "create_default_registry",
+
+    # Components
+    "ConversationManager",
+    "ToolExecutor",
+    "CostTracker",
+
+    # Agent
+    "Agent",
+    "AgentResult",
+
+    # Default tools
     "read_file",
     "run_command",
     "search_files",

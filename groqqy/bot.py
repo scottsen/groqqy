@@ -1,177 +1,140 @@
 """
-Groqqy - Core bot implementation
+Groqqy - Micro agentic bot (facade over Agent)
 
-Clean, composable architecture following functional composition principles.
-Each function has a single responsibility and is 3-7 lines.
+Clean API over composable components:
+- Agent: Agentic loop (think/act/observe)
+- Provider: LLM backend
+- ToolRegistry: Available tools
 """
 
-import json
-import sys
-from pathlib import Path
-from typing import List, Callable, Dict, Any
-from dataclasses import dataclass
+import uuid
+from typing import Optional, List, Dict, Any
 
-# Add TIA lib to path if available
-tia_lib = Path(__file__).parent.parent.parent.parent / "tia"
-if tia_lib.exists():
-    sys.path.insert(0, str(tia_lib))
-
-from lib.gemma.providers.groq_provider import GroqProvider
-from .tools import read_file, run_command, search_files, search_content
-
-
-@dataclass
-class Response:
-    """Response from LLM with cost tracking."""
-    text: str
-    cost: float
-    tool_calls: List[Dict[str, Any]] = None
+from .providers.groq import GroqProvider
+from .agent import Agent
+from .tool import ToolRegistry, create_default_registry
+from .log import get_logger
 
 
 class Groqqy:
     """
-    Simple general-purpose helper bot powered by Groq.
+    Simple micro agentic bot powered by Groq.
 
-    Architecture:
-        - Conversation management (add messages, track history)
-        - LLM interaction (get responses)
-        - Tool execution (execute and handle results)
-        - Cost tracking (per-message and total)
+    Features:
+    - Multi-step reasoning (agent loop)
+    - Tool chaining
+    - Extensible tool registry
+    - Clean, composable architecture
+
+    This is a thin facade - all heavy lifting done by Agent.
     """
 
-    def __init__(self, model: str = "llama-3.1-8b-instant", tools: List[Callable] = None):
-        """Initialize Groqqy with model and tools."""
-        self.provider = self._create_provider(model)
-        self.tools = tools or self._default_tools()
-        self.conversation = []
-        self.total_cost = 0.0
+    def __init__(
+        self,
+        model: str = "llama-3.1-8b-instant",
+        tools: Optional[ToolRegistry] = None,
+        system_instruction: Optional[str] = None,
+        max_iterations: int = 10
+    ):
+        """
+        Initialize Groqqy.
 
-    # ========================================================================
-    # Public API
-    # ========================================================================
-
-    def chat(self, user_message: str) -> tuple[str, float]:
-        """Send message and get response (orchestrates full interaction)."""
-        self._add_user_message(user_message)
-        response = self._get_response_with_tools()
-        self._add_assistant_message(response.text)
-        self._track_cost(response.cost)
-        return response.text, response.cost
-
-    def reset(self):
-        """Reset conversation history and cost."""
-        self.conversation = []
-        self.total_cost = 0.0
-
-    # ========================================================================
-    # Conversation Management
-    # ========================================================================
-
-    def _add_user_message(self, message: str):
-        """Add user message to conversation."""
-        self.conversation.append({"role": "user", "content": message})
-
-    def _add_assistant_message(self, message: str):
-        """Add assistant message to conversation."""
-        self.conversation.append({"role": "assistant", "content": message})
-
-    def _add_assistant_with_tool_calls(self, text: str, tool_calls: List[Dict]):
-        """Add assistant message that includes tool calls."""
-        self.conversation.append({
-            "role": "assistant",
-            "content": text or "",
-            "tool_calls": tool_calls
-        })
-
-    def _add_tool_result(self, tool_call_id: str, result: str):
-        """Add tool execution result to conversation."""
-        self.conversation.append({
-            "role": "tool",
-            "tool_call_id": tool_call_id,
-            "content": result
-        })
-
-    # ========================================================================
-    # LLM Interaction
-    # ========================================================================
-
-    def _get_response_with_tools(self) -> Response:
-        """Get response, executing tools if needed."""
-        response = self._call_llm()
-        if response.tool_calls:
-            response = self._execute_tools_and_retry(response)
-        return response
-
-    def _call_llm(self) -> Response:
-        """Call LLM and return standardized response."""
-        response = self.provider.chat(messages=self.conversation, tools=self.tools)
-        cost = self.provider.get_cost(response.usage)
-        return Response(text=response.text, cost=cost, tool_calls=response.tool_calls)
-
-    def _execute_tools_and_retry(self, response: Response) -> Response:
-        """Execute tool calls and get final response."""
-        self._add_assistant_with_tool_calls(response.text, response.tool_calls)
-        self._execute_all_tools(response.tool_calls)
-        followup = self._call_llm()
-        return Response(text=followup.text, cost=response.cost + followup.cost)
-
-    # ========================================================================
-    # Tool Execution
-    # ========================================================================
-
-    def _execute_all_tools(self, tool_calls: List[Dict]):
-        """Execute all tool calls and add results to conversation."""
-        for tool_call in tool_calls:
-            result = self._execute_single_tool(tool_call)
-            self._add_tool_result(tool_call['id'], result)
-
-    def _execute_single_tool(self, tool_call: Dict) -> str:
-        """Execute a single tool call and return result."""
-        func_name = tool_call['function']['name']
-        args = json.loads(tool_call['function']['arguments'])
-        tool = self._find_tool(func_name)
-        return self._call_tool(tool, args) if tool else self._tool_not_found(func_name)
-
-    def _find_tool(self, name: str) -> Callable:
-        """Find tool by name."""
-        return next((t for t in self.tools if t.__name__ == name), None)
-
-    def _call_tool(self, tool: Callable, args: Dict) -> str:
-        """Call tool with args and return result."""
-        try:
-            return tool(**args)
-        except Exception as e:
-            return f"Error executing {tool.__name__}: {e}"
-
-    def _tool_not_found(self, name: str) -> str:
-        """Return error message for missing tool."""
-        return f"Error: Tool {name} not found"
-
-    # ========================================================================
-    # Cost Tracking
-    # ========================================================================
-
-    def _track_cost(self, cost: float):
-        """Add cost to total."""
-        self.total_cost += cost
-
-    # ========================================================================
-    # Setup Helpers
-    # ========================================================================
-
-    def _create_provider(self, model: str) -> GroqProvider:
-        """Create and configure LLM provider."""
-        return GroqProvider(
-            model=model,
-            system_instruction=self._system_instruction()
+        Args:
+            model: Groq model name
+            tools: ToolRegistry (uses defaults if not provided)
+            system_instruction: Custom system prompt (uses default if not provided)
+            max_iterations: Maximum agent loop iterations
+        """
+        # Session tracking
+        self.session_id = str(uuid.uuid4())[:8]
+        self.log = get_logger("groqqy").bind(
+            session_id=self.session_id,
+            model=model
         )
 
-    def _system_instruction(self) -> str:
-        """Return system instruction for the bot."""
+        # Provider (LLM backend)
+        self.provider = GroqProvider(
+            model=model,
+            system_instruction=system_instruction or self._default_instruction()
+        )
+
+        # Tool registry
+        self.tools = tools or create_default_registry()
+
+        # Agent (does the heavy lifting)
+        self.agent = Agent(
+            provider=self.provider,
+            tools=self.tools,
+            max_iterations=max_iterations,
+            logger=self.log
+        )
+
+        self.log.info("Groqqy initialized",
+                     tool_count=len(self.tools),
+                     tools=self.tools.list_names(),
+                     max_iterations=max_iterations,
+                     has_custom_instruction=bool(system_instruction))
+
+    def chat(self, user_message: str) -> tuple[str, float]:
+        """
+        Send message and get response.
+
+        Runs the full agent loop:
+        - Can use tools multiple times
+        - Can chain tool calls
+        - Multi-step reasoning
+
+        Args:
+            user_message: User's input
+
+        Returns:
+            (response_text, cost) tuple
+        """
+        self.log.debug("Chat started",
+                      message_length=len(user_message),
+                      message_preview=user_message[:100])
+
+        result = self.agent.run(user_message)
+
+        self.log.info("Chat completed",
+                     iterations=result.iterations,
+                     tool_calls=result.tool_calls_made,
+                     cost=result.total_cost,
+                     total_cost=self.total_cost)
+
+        return result.response, result.total_cost
+
+    def reset(self):
+        """Reset conversation history and cost tracking."""
+        prev_turns = len(self.agent.conversation)
+        prev_cost = self.agent.tracker.get_total()
+
+        self.agent.reset()
+
+        self.log.info("Conversation reset",
+                     previous_turns=prev_turns,
+                     previous_cost=prev_cost)
+
+    # ========================================================================
+    # Properties (for backwards compatibility)
+    # ========================================================================
+
+    @property
+    def total_cost(self) -> float:
+        """Get total accumulated cost."""
+        return self.agent.tracker.get_total()
+
+    @property
+    def conversation(self) -> List[Dict[str, Any]]:
+        """Get conversation history."""
+        return self.agent.conversation.get_history()
+
+    # ========================================================================
+    # Helpers
+    # ========================================================================
+
+    def _default_instruction(self) -> str:
+        """Return default system instruction."""
         return """You are Groqqy, a helpful assistant.
 You have access to tools for reading files, running commands, and searching.
 Keep responses concise and friendly. Use tools when needed to help the user."""
-
-    def _default_tools(self) -> List[Callable]:
-        """Return default tool set."""
-        return [read_file, run_command, search_files, search_content]

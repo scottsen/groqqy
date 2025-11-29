@@ -3,6 +3,7 @@ Tools that Groqqy can use
 """
 
 import subprocess
+import shlex
 from pathlib import Path
 
 
@@ -16,7 +17,12 @@ def read_file(file_path: str) -> str:
 
 
 def run_command(command: str) -> str:
-    """Execute a shell command and return output."""
+    """
+    Execute a shell command and return output.
+
+    WARNING: This executes arbitrary shell commands. Use with caution.
+    The LLM has full shell access through this tool.
+    """
     try:
         result = subprocess.run(
             command,
@@ -34,10 +40,14 @@ def run_command(command: str) -> str:
 
 
 def search_files(pattern: str, path: str = ".") -> str:
-    """Find files matching a pattern."""
+    """Find files matching a pattern (uses shell glob pattern)."""
     try:
+        # Use shlex.quote to prevent injection attacks
+        safe_path = shlex.quote(path)
+        safe_pattern = shlex.quote(pattern)
+
         result = subprocess.run(
-            f"find {path} -name '{pattern}' -type f 2>/dev/null | head -20",
+            f"find {safe_path} -name {safe_pattern} -type f 2>/dev/null | head -20",
             shell=True,
             capture_output=True,
             text=True
@@ -51,8 +61,12 @@ def search_files(pattern: str, path: str = ".") -> str:
 def search_content(query: str, path: str = ".") -> str:
     """Search for text in files."""
     try:
+        # Use shlex.quote to prevent injection attacks
+        safe_path = shlex.quote(path)
+        safe_query = shlex.quote(query)
+
         result = subprocess.run(
-            f"grep -r '{query}' {path} 2>/dev/null | head -20",
+            f"grep -r {safe_query} {safe_path} 2>/dev/null | head -20",
             shell=True,
             capture_output=True,
             text=True
