@@ -53,6 +53,12 @@ Configuration:
         help='Skip loading ~/.groqqy/boot.md'
     )
 
+    parser.add_argument(
+        '--export',
+        metavar='FILE',
+        help='Export conversation on exit (format auto-detected from extension: .md or .html)'
+    )
+
     return parser.parse_args()
 
 
@@ -61,6 +67,7 @@ def run_interactive(bot: Groqqy):
     print("🤖 Groqqy - Your helpful assistant (powered by Groq)")
     print("Type 'quit' or 'exit' to end conversation")
     print("Type 'reset' to clear conversation history")
+    print("Type 'export <format> <filepath>' to save conversation (markdown or html)")
     print("=" * 60)
     print()
 
@@ -79,6 +86,23 @@ def run_interactive(bot: Groqqy):
             if user_input.lower() == 'reset':
                 bot.reset()
                 print("🔄 Conversation reset\n")
+                continue
+
+            # Handle export command
+            if user_input.lower().startswith('export '):
+                try:
+                    parts = user_input.split(None, 2)
+                    if len(parts) < 3:
+                        print("❌ Usage: export <format> <filepath>")
+                        print("   Formats: markdown, html")
+                        print("   Example: export markdown conversation.md\n")
+                        continue
+
+                    _, format_type, filepath = parts
+                    bot.save_conversation(filepath, format=format_type)
+                    print(f"✅ Conversation exported to {filepath} ({format_type})\n")
+                except Exception as e:
+                    print(f"❌ Export failed: {e}\n")
                 continue
 
             # Get response
@@ -131,10 +155,28 @@ def main():
     )
 
     # Run in appropriate mode
-    if args.prompt:
-        run_single_prompt(bot, args.prompt)
-    else:
-        run_interactive(bot)
+    try:
+        if args.prompt:
+            run_single_prompt(bot, args.prompt)
+        else:
+            run_interactive(bot)
+    finally:
+        # Export conversation if requested
+        if args.export and len(bot.conversation) > 0:
+            try:
+                # Auto-detect format from file extension
+                if args.export.lower().endswith('.html'):
+                    format_type = 'html'
+                elif args.export.lower().endswith('.md'):
+                    format_type = 'markdown'
+                else:
+                    # Default to markdown
+                    format_type = 'markdown'
+
+                bot.save_conversation(args.export, format=format_type)
+                print(f"✅ Conversation exported to {args.export} ({format_type})", file=sys.stderr)
+            except Exception as e:
+                print(f"❌ Failed to export conversation: {e}", file=sys.stderr)
 
 
 if __name__ == "__main__":

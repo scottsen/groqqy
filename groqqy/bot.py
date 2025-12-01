@@ -14,6 +14,7 @@ from .providers.groq import GroqProvider
 from .agent import Agent
 from .tool import ToolRegistry, create_default_registry
 from .log import get_logger
+from .components.exporter import ConversationExporter
 
 
 class Groqqy:
@@ -132,6 +133,52 @@ class Groqqy:
     # ========================================================================
     # Helpers
     # ========================================================================
+
+    def export_markdown(self) -> str:
+        """
+        Export current conversation to Markdown format.
+
+        Returns:
+            Markdown-formatted conversation string
+        """
+        exporter = ConversationExporter(self.conversation)
+        return exporter.to_markdown()
+
+    def export_html(self, include_css: bool = True) -> str:
+        """
+        Export current conversation to HTML format.
+
+        Args:
+            include_css: Include embedded CSS styling
+
+        Returns:
+            HTML-formatted conversation string
+        """
+        exporter = ConversationExporter(self.conversation)
+        return exporter.to_html(include_css=include_css)
+
+    def save_conversation(self, filepath: str, format: str = "markdown"):
+        """
+        Save conversation to file.
+
+        Args:
+            filepath: Path to save file
+            format: Export format - "markdown" or "html"
+        """
+        if format.lower() == "markdown":
+            content = self.export_markdown()
+        elif format.lower() == "html":
+            content = self.export_html()
+        else:
+            raise ValueError(f"Unsupported format: {format}. Use 'markdown' or 'html'")
+
+        with open(filepath, 'w', encoding='utf-8') as f:
+            f.write(content)
+
+        self.log.info("Conversation exported",
+                     filepath=filepath,
+                     format=format,
+                     message_count=len(self.conversation))
 
     def _default_instruction(self) -> str:
         """Return default system instruction."""
