@@ -2,33 +2,29 @@
 
 **Clean, composable micro agentic bot powered by Groq**
 
-Ultra-fast, ultra-cheap, and truly agentic. Groqqy is a multi-step reasoning agent that can read files, run commands, search content, and chain tool calls to complete complex tasks.
+Ultra-fast, ultra-cheap, and truly agentic. Groqqy is a multi-step reasoning agent that reads files, runs commands, searches content, and chains tool calls to complete complex tasks—all with production-ready code that's perfect for learning.
 
 ## Why Groqqy?
 
-- ⚡ **Fast**: 460+ tokens/sec (11x faster than standard inference)
-- 💰 **Cheap**: $0.00002-$0.00006 per interaction (300x cheaper than GPT-4)
-- 🧠 **Agentic**: Multi-step reasoning loop (THINK → ACT → OBSERVE)
-- 🛠️ **Tool-capable**: Execute local tools with automatic chaining
-- 🧩 **Composable**: Mix and match components (Agent, Tools, Memory, etc.)
-- 📚 **Teaching-friendly**: Clean, readable code perfect for learning agentic AI
+- ⚡ **Blazing Fast**: 460+ tokens/sec (11x faster than standard inference)
+- 💰 **Ultra Cheap**: $0.00002-$0.00006 per interaction (300x cheaper than GPT-4)
+- 🧠 **Truly Agentic**: Multi-step reasoning loop (THINK → ACT → OBSERVE)
+- 🛠️ **Tool-Capable**: Execute local and platform tools with automatic chaining
+- 🧩 **Composable**: Mix and match components (Agent, Tools, Strategies, etc.)
+- 📚 **Teaching-Friendly**: Clean, readable code (<200 lines per file) perfect for learning agentic AI
+- 📝 **Export Ready**: Save conversations to markdown/HTML with full tool call visibility
 
-## What's New in v2.0.0
+## What's New in v2.1.0
 
-**Strategy Pattern + Platform Tools** - Extensible tool execution architecture:
+**Documentation & Export Features:**
 
-- ✨ **Strategy Pattern**: Pluggable tool execution (Local/Platform/Hybrid strategies)
-- 🌐 **Web Search**: Browser search via Groq's platform tools (Tavily API)
-- 🔌 **Platform Tools**: Server-side tool execution (browser_search, web_search)
-- 🎯 **Auto-Detection**: Automatically selects appropriate strategy based on tool types
-- 🔄 **Backward Compatible**: Existing code works unchanged
+- 📝 **Conversation Export**: Export full conversations to markdown/HTML with tool call details
+- 🎓 **Self-Discovery**: Agents can autonomously learn new tools via minimal seed prompts
+- 🧪 **Container Testing**: Reproducible testing infrastructure with Podman
+- 📚 **Documentation Reorganization**: Clean structure with guides and examples
+- 🧹 **Project Cleanup**: Professional structure, organized tests, comprehensive examples
 
-See [CHANGELOG.md](CHANGELOG.md) for full details.
-
-### Previous: v0.3.0 Architecture Refactor
-- ✅ Agentic Loop: Multi-step reasoning (think/act/observe pattern)
-- ✅ Tool Registry: Dynamic tool registration
-- ✅ Composable Components: ConversationManager, ToolExecutor, CostTracker
+See [CHANGELOG.md](CHANGELOG.md) for full history.
 
 ## Installation
 
@@ -37,11 +33,19 @@ See [CHANGELOG.md](CHANGELOG.md) for full details.
 git clone https://github.com/scottsen/groqqy.git
 cd groqqy
 
-# Install (use virtual environment recommended)
+# Install in development mode (recommended)
 pip install -e .
+
+# Or install directly
+pip install .
 ```
 
-**Note:** Requires Python 3.8+ and a Groq API key (set `GROQ_API_KEY` environment variable).
+**Requirements:** Python 3.8+ and a Groq API key (free at [console.groq.com](https://console.groq.com))
+
+**Setup:**
+```bash
+export GROQ_API_KEY="your-api-key-here"
+```
 
 ## Quick Start
 
@@ -51,303 +55,271 @@ pip install -e .
 groqqy
 ```
 
-Or using Python module directly:
+```
+Groqqy 🤖 (llama-3.1-8b-instant)
+Type 'help' for commands, 'exit' to quit
 
-```bash
-python -m groqqy.cli
+You: Find all Python files in the current directory
+Groqqy: I'll search for Python files...
+        [Searches, finds files, reports results]
+
+You: Read the first one and summarize it
+Groqqy: [Reads file, provides summary]
+
+You: export markdown my_session.md
+✅ Conversation exported to my_session.md
 ```
 
 ### Programmatic Use
 
-**Basic usage** (same API as before):
-
 ```python
 from groqqy import Groqqy
 
+# Create bot
 bot = Groqqy()
 
-# Simple conversation
+# Simple chat
 response, cost = bot.chat("Hello! What can you do?")
 print(response)
 print(f"Cost: ${cost:.6f}")
 
-# Use tools (agent will chain them as needed)
-response, cost = bot.chat("Find all .py files and count the lines in each")
-print(response)  # Agent will: search → read each file → count → report
+# Agentic task (agent chains tools automatically)
+response, cost = bot.chat("Find all .py files and count lines in each")
+print(response)
+# Agent will: search_files("*.py") → read_file(each) → count → report
 
-# Reset conversation
-bot.reset()
+# Export conversation
+bot.save_conversation("session.html")  # Auto-styled HTML
+bot.save_conversation("session.md")     # Clean markdown
 ```
 
-**Advanced usage** (new in v0.3.0):
-
-```python
-from groqqy import Groqqy, ToolRegistry
-
-# Create custom tool registry
-registry = ToolRegistry()
-
-def analyze_sentiment(text: str) -> str:
-    """Analyze sentiment of text."""
-    # Your implementation
-    return "Positive sentiment detected"
-
-registry.register_function(analyze_sentiment)
-
-# Create bot with custom tools and settings
-bot = Groqqy(
-    model="llama-3.3-70b-versatile",
-    tools=registry,
-    max_iterations=20,  # Allow more complex reasoning
-    system_instruction="You are a helpful code analyst"
-)
-
-response, cost = bot.chat("Analyze the sentiment of README.md")
-```
-
-### Platform Tools & Web Search (v2.0+)
-
-Groqqy now supports **platform tools** that execute on Groq's servers, starting with **browser_search** for web access:
-
-```python
-from groqqy import Groqqy
-from groqqy.tool import ToolRegistry
-
-# Create registry with platform tool
-registry = ToolRegistry()
-registry.register_platform_tool("browser_search")
-
-# Use a compatible model
-bot = Groqqy(
-    model="openai/gpt-oss-20b",  # Required for platform tools
-    tools=registry
-)
-
-# Ask questions that require web search
-response, cost = bot.chat(
-    "What are the latest developments in AI this week?"
-)
-print(response)  # Gets current information from the web
-```
-
-**Compatible Models for Platform Tools:**
-- `openai/gpt-oss-20b` (recommended)
-- `llama-3.3-70b-versatile`
-- Llama 4 Scout (when available)
-
-**Mix with Local Tools (Hybrid):**
-```python
-from groqqy.tools import read_file, search_files
-
-# Add both platform and local tools
-registry.register_platform_tool("browser_search")
-registry.register_function(read_file)
-registry.register_function(search_files)
-
-bot = Groqqy(model="openai/gpt-oss-20b", tools=registry)
-
-# Agent automatically uses appropriate tools
-response, cost = bot.chat(
-    "Search the web for Python best practices, "
-    "then check if our code follows them"
-)
-# Uses browser_search for web + read_file for local code
-```
-
-**How Platform Tools Work:**
-- Tools execute **server-side** on Groq's infrastructure
-- Results appear directly in the response (no local execution)
-- Strategy Pattern automatically detects and handles tool types
-- See `examples/example_web_search.py` for complete examples
-
-## Architecture
-
-### High-Level Overview
-
-```
-┌─────────────────────────────────────────┐
-│           Bot (Simple API)              │
-│  chat() ──► Agent.run()                 │
-│  reset() ──► Agent.reset()              │
-└─────────────────┬───────────────────────┘
-                  │
-        ┌─────────▼──────────┐
-        │       Agent        │
-        │  (Agentic Loop)    │
-        │  THINK→ACT→OBSERVE │
-        └─────────┬──────────┘
-                  │
-      ┌───────────┼───────────┬──────────────┐
-      │           │           │              │
-      ▼           ▼           ▼              ▼
-┌──────────┐ ┌────────┐ ┌──────────┐ ┌──────────┐
-│Conversat-│ │  Tool  │ │   Cost   │ │ Provider │
-│ion Mgr   │ │Executor│ │ Tracker  │ │  (LLM)   │
-└──────────┘ └────┬───┘ └──────────┘ └──────────┘
-                  │
-                  ▼
-            ┌──────────────┐
-            │ToolRegistry  │
-            │ (extensible) │
-            └──────────────┘
-```
-
-### Agentic Loop (THINK → ACT → OBSERVE)
-
-The heart of Groqqy is the multi-step reasoning loop in `agent.py`:
-
-```
-User: "Find Python files and count their lines"
-    │
-    ▼
-┌───────────────┐
-│  THINK (LLM)  │ ──► "I need to search for .py files first"
-└───────┬───────┘
-        │
-        ▼
-┌───────────────┐
-│  ACT (Tool)   │ ──► execute: search_files("*.py")
-└───────┬───────┘
-        │
-        ▼
-┌───────────────┐
-│  OBSERVE      │ ──► "Found: app.py, test.py, main.py"
-└───────┬───────┘
-        │
-        ▼
-┌───────────────┐
-│  THINK (LLM)  │ ──► "Now I need to read each file and count lines"
-└───────┬───────┘
-        │
-        ▼
-┌───────────────┐
-│  ACT (Tools)  │ ──► execute: read_file("app.py"), read_file("test.py"), ...
-└───────┬───────┘
-        │
-        ▼
-┌───────────────┐
-│  OBSERVE      │ ──► "app.py: 150 lines, test.py: 89 lines, ..."
-└───────┬───────┘
-        │
-        ▼
-┌───────────────┐
-│  THINK (LLM)  │ ──► "I have all the data, I'll summarize"
-└───────┬───────┘
-        │
-        ▼
-┌───────────────────────────────┐
-│  Response: "Found 3 Python   │
-│  files with a total of 289    │
-│  lines: app.py (150), ..."    │
-└───────────────────────────────┘
-```
-
-This pattern follows the **ReAct** framework (Yao et al., 2022) and enables true agentic behavior.
-
-### File Structure
-
-```
-groqqy/
-├── __init__.py              # Package exports
-├── bot.py (140 lines)       # Simple facade over Agent
-├── agent.py (175 lines)     # Agentic loop (THINK/ACT/OBSERVE)
-├── strategy.py (209 lines)  # Tool execution strategies (v2.0+)
-├── tool.py (199 lines)      # Tool registry system
-├── tools.py (77 lines)      # Built-in tools (read, search, run)
-├── cli.py (141 lines)       # Interactive CLI
-├── config.py (116 lines)    # Configuration system (~/.groqqy/)
-├── log.py (117 lines)       # Logging (loguru + JSONL)
-├── provider.py (35 lines)   # Provider interface
-├── utils.py (73 lines)      # Tool schema builder
-│
-├── components/              # Composable components
-│   ├── conversation.py      # Message history manager
-│   ├── executor.py          # Tool execution with error handling
-│   └── tracker.py           # Cost tracking
-│
-└── providers/               # LLM providers
-    └── groq.py              # Groq provider implementation
-```
-
-**Key Design Principles:**
-- All files <200 lines
-- Single responsibility per component
-- Easy to understand and modify
-- Production-ready patterns
-
-See [ARCHITECTURE.md](ARCHITECTURE.md) for detailed component descriptions.
-
-## Built-in Tools
-
-Groqqy comes with 4 essential tools:
-
-1. **read_file(file_path: str)** - Read file contents
-2. **run_command(command: str)** - Execute shell commands (secure)
-3. **search_files(pattern: str, path: str)** - Find files by pattern
-4. **search_content(query: str, path: str)** - Search text in files
-
-All tools use `shlex.quote()` for security (prevents shell injection).
-
-## Custom Tools
-
-### Simple Approach (Pass Functions)
+### Custom Tools
 
 ```python
 from groqqy import Groqqy
 
 def get_weather(city: str) -> str:
-    """Get weather for a city."""
+    """Get current weather for a city."""
     # Your implementation
     return f"Weather in {city}: Sunny, 72°F"
 
 def calculate_tip(bill: float, percent: float = 15.0) -> str:
-    """Calculate tip amount."""
+    """Calculate tip amount for a bill."""
     tip = bill * (percent / 100)
     return f"Tip: ${tip:.2f}, Total: ${bill + tip:.2f}"
 
 # Just pass functions - auto-registration!
 bot = Groqqy(tools=[get_weather, calculate_tip])
-response, cost = bot.chat("What's the weather in SF?")
+
+response, cost = bot.chat("What's the weather in San Francisco?")
+# Agent automatically calls get_weather("San Francisco")
 ```
 
-### Advanced Approach (Tool Registry)
+## Core Features
+
+### 🧠 Agentic Loop
+
+Groqqy implements the **ReAct pattern** (Reasoning + Acting) for true multi-step problem solving:
+
+```
+User: "Find Python files and count their lines"
+     ↓
+┌────────────────┐
+│ THINK (LLM)    │  "I need to search for .py files first"
+└────────┬───────┘
+         ↓
+┌────────────────┐
+│ ACT (Tool)     │  execute: search_files("*.py")
+└────────┬───────┘
+         ↓
+┌────────────────┐
+│ OBSERVE        │  "Found: app.py, test.py, utils.py"
+└────────┬───────┘
+         ↓
+┌────────────────┐
+│ THINK (LLM)    │  "Now read each file and count lines"
+└────────┬───────┘
+         ↓
+┌────────────────┐
+│ ACT (Tools)    │  execute: read_file("app.py"), read_file("test.py")...
+└────────┬───────┘
+         ↓
+     [Response]
+```
+
+See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for deep dive.
+
+### 🛠️ Built-in Tools
+
+- `read_file(file_path)` - Read file contents
+- `run_command(command)` - Execute shell commands (secure with shlex)
+- `search_files(pattern, path)` - Find files by glob pattern
+- `search_content(query, path)` - Search text in files (ripgrep)
+
+### 🌐 Platform Tools (v2.0+)
+
+Execute tools on Groq's servers (e.g., web search):
 
 ```python
 from groqqy import Groqqy, ToolRegistry
 
-# Create registry
 registry = ToolRegistry()
+registry.register_platform_tool("browser_search")
 
-# Define tools
-def analyze_code(file_path: str) -> str:
-    """Analyze Python code for issues."""
-    # Your implementation
-    return "Analysis: 3 issues found..."
+bot = Groqqy(model="llama-3.3-70b-versatile", tools=registry)
 
-def run_tests(test_pattern: str) -> str:
-    """Run tests matching pattern."""
-    # Your implementation
-    return "Tests passed: 15/15"
-
-# Register with custom descriptions
-registry.register_function(analyze_code, "Static analysis tool")
-registry.register_function(run_tests, "Test runner")
-
-# Inspect registry
-print(f"Available tools: {registry.list_names()}")
-print(f"Total tools: {len(registry)}")
-
-# Use in bot
-bot = Groqqy(tools=registry)
+response, cost = bot.chat(
+    "What are the latest AI developments this week?"
+)
+# Agent uses browser_search to get current web information
 ```
 
-**Tool Requirements:**
-- Type annotations for all parameters
-- Docstring (used as tool description for LLM)
-- Return type: `str` (LLM sees the output)
-- Handle errors gracefully (return error message, don't raise)
+### 📝 Conversation Export
 
-See `examples/custom_tools.py` for complete examples.
+Export full conversations with tool calls and results:
+
+```python
+# During a session
+bot.chat("Calculate the weather in NYC")
+bot.chat("What's 15% tip on $87.50?")
+
+# Export to markdown
+bot.save_conversation("session.md")
+
+# Export to styled HTML
+bot.save_conversation("session.html")
+```
+
+**CLI auto-export:**
+```bash
+groqqy --export my_session.html
+```
+
+**Interactive export:**
+```
+You: export markdown conversation.md
+✅ Conversation exported to conversation.md
+```
+
+Exports include:
+- All user messages
+- All assistant responses
+- All tool calls with JSON arguments
+- All tool results
+- Timestamps and metadata
+
+Perfect for documentation, debugging, or sharing agent behavior.
+
+### 🎯 Strategy Pattern
+
+Automatic tool execution strategy selection:
+- **LocalToolStrategy**: Execute tools in your environment
+- **PlatformToolStrategy**: Execute on Groq's servers (browser_search, etc.)
+- **HybridToolStrategy**: Mix local and platform tools intelligently
+
+No configuration needed—strategies auto-detect based on tool types.
+
+## Examples
+
+Check out the [`examples/`](examples/) directory:
+
+- **basic_chat.py** - Simple conversation
+- **custom_tools.py** - Adding custom tools with decorator pattern
+- **tool_usage.py** - Tool calling and chaining
+- **export_conversation.py** - Exporting to markdown/HTML
+- **example_web_search.py** - Using platform tools for web access
+- **reveal_mvp_demo.py** - Self-discovery pattern with reveal-cli
+- **self_discovery_demo.py** - Autonomous tool learning
+
+Run any example:
+```bash
+python examples/basic_chat.py
+```
+
+## Documentation
+
+- **[docs/USER_GUIDE.md](docs/USER_GUIDE.md)** - Comprehensive usage guide
+- **[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)** - Deep dive into design and components
+- **[docs/TEACHING_GUIDE.md](docs/TEACHING_GUIDE.md)** - Using Groqqy to learn/teach agentic AI
+- **[docs/guides/](docs/guides/)** - Feature-specific guides and tutorials
+- **[CONTRIBUTING.md](CONTRIBUTING.md)** - How to contribute
+- **[DEVELOPMENT.md](DEVELOPMENT.md)** - Developer setup and workflow
+
+## Architecture
+
+Groqqy is built with clean, composable components:
+
+```
+groqqy/
+├── bot.py              # Simple facade (Groqqy class)
+├── agent.py            # Agentic loop (THINK/ACT/OBSERVE)
+├── strategy.py         # Tool execution strategies
+├── tool.py             # Tool registry system
+├── tools.py            # Built-in tools
+├── components/
+│   ├── conversation.py # Message history
+│   ├── executor.py     # Tool execution
+│   ├── exporter.py     # Conversation export
+│   └── tracker.py      # Cost tracking
+└── providers/
+    └── groq.py         # Groq API integration
+```
+
+**Design Principles:**
+- All files <365 lines (most <200)
+- Single responsibility per component
+- Easy to read, understand, and modify
+- Production-ready patterns (logging, error handling, cost tracking)
+
+## Teaching & Learning
+
+Groqqy is designed as a **teaching kernel for agentic AI**. Unlike production frameworks (LangChain, LangGraph) with 50,000+ lines of code, Groqqy is:
+
+- ✅ **~1,500 lines** for complete agentic loop
+- ✅ **88-line core algorithm** - read and understand in 5 minutes
+- ✅ **Explicit patterns** - THINK/ACT/OBSERVE labeled in code
+- ✅ **Production-ready** - not toy code, real patterns
+- ✅ **Pedagogical** - designed for learning then extending
+
+**Perfect for:**
+- Computer science courses on AI agents
+- Self-learners exploring agentic patterns
+- Developers understanding agents before using frameworks
+- Workshops and tutorials on tool-calling LLMs
+
+See [docs/TEACHING_GUIDE.md](docs/TEACHING_GUIDE.md) for lesson plans and learning paths.
+
+## Cost Examples
+
+Real costs from actual usage:
+
+| Task | Cost |
+|------|------|
+| Simple conversation | $0.000022 |
+| Search files | $0.000028 |
+| Run command | $0.000032 |
+| Multi-step task (3 tools) | ~$0.000120 |
+| **1,000 interactions** | **~$0.03-$0.12** |
+
+Compare to GPT-4: ~$10-$100 for 1,000 interactions (300x more expensive)
+
+## Testing
+
+```bash
+# Run all tests
+pytest
+
+# Run specific test category
+pytest tests/unit/
+pytest tests/integration/
+pytest tests/examples/
+
+# Run with coverage
+pytest --cov=groqqy
+
+# Container testing (reproducible environment)
+./container_test.sh
+```
 
 ## Configuration
 
@@ -355,53 +327,19 @@ Groqqy supports persistent configuration via `~/.groqqy/`:
 
 ```bash
 ~/.groqqy/
-├── boot.md              # System instructions (loaded on startup)
+├── boot.md              # System instructions loaded on startup
 └── knowledge/           # Additional context files
-    ├── domain_info.md
-    └── api_docs.txt
+    └── domain_info.md
 ```
 
 **CLI options:**
-
 ```bash
-# Interactive mode (loads boot.md)
-groqqy
-
-# Single-shot mode
-groqqy --prompt "What's 15 * 23?"
-
-# With context files
-groqqy --context docs.md --context api.txt -p "Explain the API"
-
-# Skip boot.md
-groqqy --no-boot
-
-# Custom model
-groqqy --model llama-3.3-70b-versatile
+groqqy                              # Interactive with boot.md
+groqqy --prompt "What's 2+2?"       # Single-shot
+groqqy --model llama-3.3-70b-versatile  # Custom model
+groqqy --export chat.html           # Auto-export on exit
+groqqy --no-boot                    # Skip boot.md
 ```
-
-**Programmatic configuration:**
-
-```python
-bot = Groqqy(
-    model="llama-3.1-8b-instant",
-    tools=my_tools,
-    max_iterations=20,
-    system_instruction="You are a code analyst specialized in Python"
-)
-```
-
-## Cost Examples
-
-Real costs from actual usage:
-
-- Simple conversation: $0.000022
-- Search files: $0.000028
-- Run command: $0.000032
-- Read file: $0.000058
-- **Multi-step task** (3 tool calls): ~$0.000120
-
-**1,000 interactions: ~$0.03-$0.12** (vs $10-$100 with other providers)
 
 ## Models
 
@@ -419,126 +357,51 @@ bot = Groqqy(model="llama-3.3-70b-versatile")
 
 # Mixture of experts
 bot = Groqqy(model="mixtral-8x7b-32768")
+
+# Platform tools (required for browser_search)
+bot = Groqqy(model="llama-3.3-70b-versatile")  # or openai/gpt-oss-20b
 ```
 
-## Advanced Usage
+## Contributing
 
-### Component Composition
+Contributions welcome! See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 
-For advanced users who want to customize behavior:
+**Quick start for contributors:**
+```bash
+# Clone and install
+git clone https://github.com/scottsen/groqqy.git
+cd groqqy
+pip install -e ".[dev]"
 
-```python
-from groqqy import Agent, ToolRegistry, ConversationManager, ToolExecutor, CostTracker
-from groqqy.providers import GroqProvider
+# Run tests
+pytest
 
-# Create custom components
-provider = GroqProvider(model="llama-3.3-70b-versatile")
-registry = ToolRegistry()
-registry.register_function(my_custom_tool)
+# Format code
+black groqqy/ tests/
 
-# Compose custom agent
-agent = Agent(
-    provider=provider,
-    tools=registry,
-    max_iterations=50  # More complex reasoning
-)
-
-# Run directly
-result = agent.run("Complex multi-step task")
-print(result.response)
-print(f"Iterations: {result.iterations}")
-print(f"Tool calls: {result.tool_calls_made}")
-print(f"Cost: ${result.total_cost:.6f}")
+# Type check
+mypy groqqy/
 ```
-
-### Custom Components
-
-Extend components with custom behavior:
-
-```python
-from groqqy.components import ToolExecutor
-
-class CachingExecutor(ToolExecutor):
-    """Tool executor with result caching."""
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.cache = {}
-
-    def execute(self, tool_call):
-        # Create cache key
-        key = (tool_call['function']['name'],
-               tool_call['function']['arguments'])
-
-        # Check cache
-        if key in self.cache:
-            return self.cache[key]
-
-        # Execute and cache
-        result = super().execute(tool_call)
-        self.cache[key] = result
-        return result
-
-# Use in agent
-from groqqy import Agent
-agent = Agent(provider, tools, executor=CachingExecutor(tools))
-```
-
-## Examples
-
-See `examples/` directory:
-
-- **basic_chat.py** - Simple conversation
-- **custom_tools.py** - Adding custom tools
-- **tool_usage.py** - Tool calling patterns
-
-## Teaching & Learning
-
-Groqqy is designed as a **teaching kernel for agentic AI**. The codebase is:
-
-- **Readable**: All files <200 lines, clear intent
-- **Well-structured**: Clean separation of concerns
-- **Pedagogical**: Comments explain THINK/ACT/OBSERVE pattern
-- **Production-ready**: Real patterns (logging, cost tracking, safety)
-
-**For educators and learners**, see:
-- [TEACHING_GUIDE.md](TEACHING_GUIDE.md) - How to use Groqqy to learn/teach agentic AI
-- [ARCHITECTURE.md](ARCHITECTURE.md) - Deep dive into component design
-- [AGENTIC_ARCHITECTURE_PROPOSAL.md](AGENTIC_ARCHITECTURE_PROPOSAL.md) - Design philosophy
-
-**Key concepts demonstrated:**
-- ReAct pattern (Thought → Action → Observation)
-- Tool calling and execution
-- Multi-step reasoning
-- Dynamic tool registration
-- Composable architecture
-- Production safety (max iterations, error handling, cost tracking)
-
-## Requirements
-
-- Python 3.8+
-- Groq API key (set `GROQ_API_KEY` env var)
-- Dependencies: `requests`, `loguru` (auto-installed via pip)
 
 ## License
 
-MIT
+MIT License - see [LICENSE](LICENSE) file for details.
 
-## Related
+## Related Projects
 
-- [Groq API Docs](https://console.groq.com/docs)
-- [ReAct Paper](https://arxiv.org/abs/2210.03629) (Yao et al., 2022)
+- [Groq API Docs](https://console.groq.com/docs) - Groq's LPU inference
+- [ReAct Paper](https://arxiv.org/abs/2210.03629) - Reasoning + Acting framework (Yao et al., 2022)
 - [LangChain](https://python.langchain.com/) - Production agentic framework
 - [LangGraph](https://langchain-ai.github.io/langgraph/) - Graph-based agents
 
-## Version History
+## Support & Community
 
-- **v0.3.0** (2025-11-28) - Agentic architecture refactor (multi-step reasoning)
-- **v0.2.0** (2025-11-28) - Configuration system + security fixes
-- **v0.1.0** (2025-11-27) - Initial standalone release
+- **Issues**: [GitHub Issues](https://github.com/scottsen/groqqy/issues)
+- **Discussions**: [GitHub Discussions](https://github.com/scottsen/groqqy/discussions)
+- **Examples**: Check [`examples/`](examples/) directory
 
 ---
 
 **Built with ❤️ using Groq's blazing-fast LPU inference**
 
-**Perfect for:** Learning agentic AI, rapid prototyping, cost-conscious automation, teaching AI agents
+**Perfect for:** Learning agentic AI • Rapid prototyping • Cost-conscious automation • Teaching AI agents • Building proof-of-concepts

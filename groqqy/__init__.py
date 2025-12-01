@@ -4,7 +4,7 @@ Groqqy - Micro agentic bot powered by Groq
 Fast, cheap, helpful, and extensible.
 """
 
-__version__ = "2.0.0"
+__version__ = "2.1.0"
 
 # Main bot
 from .bot import Groqqy

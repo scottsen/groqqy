@@ -5,6 +5,113 @@ All notable changes to Groqqy will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+## [2.1.0] - 2025-12-01
+
+### Added
+
+**🎨 Conversation Export**
+- Full conversation export to Markdown and HTML formats
+  - `bot.export_markdown()`: Export to clean markdown with code blocks
+  - `bot.export_html()`: Export to styled HTML with embedded CSS (purple gradient theme)
+  - `bot.save_conversation(filepath, format)`: Auto-detects format from extension
+  - Interactive command: `export <format> <filepath>` during chat sessions
+  - CLI flag: `--export <filepath>` for auto-export on exit
+  - `ConversationExporter` component (362 lines): Single-responsibility formatter
+  - Preserves complete conversation flow (user/assistant/tool messages and results)
+  - Includes tool call visibility (JSON arguments + complete results)
+  - Timestamps, message counts, and metadata
+  - Perfect for documentation, debugging, and sharing agent behavior
+  - New example: `examples/export_conversation.py`
+
+**🎓 Self-Discovery Pattern**
+- Autonomous tool learning via minimal seed prompts
+- 11-line MVP seed prompt enables agent to learn tools independently
+- Agent reads tool documentation (e.g., `reveal --agent-help`) and learns autonomously
+- Cost-efficient: ~$0.002-$0.004 per learning session
+- Examples: `examples/reveal_mvp_demo.py`, `examples/self_discovery_demo.py`
+- Documentation: `docs/SELF_DISCOVERY_SEED_PROMPT.md`, `docs/REVEAL_SEED_PROMPT_MVP.md`
+
+**🧪 Container Testing Infrastructure**
+- Reproducible testing with Podman/Docker
+- `Containerfile`: Python 3.11 + groqqy + reveal-cli
+- `test_container.py`: Automated 3-test suite (export, reveal, integration)
+- `container_test.sh`: One-command testing
+- `container_interactive.sh`: Interactive shell for debugging
+- `demo_reveal_learning.sh`: Self-discovery demonstration script
+- Clean environment validates no hidden dependencies
+- Documentation: `docs/guides/CONTAINER_TESTING.md`
+
+**📚 Documentation & Project Structure**
+- **Documentation reorganization**:
+  - Created `docs/` directory with logical structure
+  - `docs/archive/`: Historical documents (5 files, 2,691 lines archived from root)
+  - `docs/guides/`: Feature-specific guides (3 guides)
+  - Moved `ARCHITECTURE.md` and `TEACHING_GUIDE.md` to `docs/`
+  - Cleaned root from 15+ markdown files to 6 core files
+- **Test organization**:
+  - Created `tests/` structure with `unit/`, `integration/`, `examples/` subdirectories
+  - Moved all test files from root to categorized locations
+  - Added `pytest.ini` for consistent test execution
+- **Examples enhancement**:
+  - Added comprehensive `examples/README.md` with descriptions and usage
+  - Organized 7 examples by category (Getting Started, Tools, Export, Platform, Self-Discovery)
+  - Added troubleshooting section and best practices
+- **New project files**:
+  - `pyproject.toml`: Modern Python packaging with metadata and dev dependencies
+  - `Makefile`: Common development tasks (install, test, lint, format, clean)
+  - Updated `.gitignore`: Added patterns for test outputs and artifacts
+- **Polished README.md**:
+  - Reduced from 607 to 407 lines (33% reduction)
+  - Cleaner structure focused on quick start and key features
+  - Better navigation with links to comprehensive guides
+  - Added cost comparison table and testing section
+
+**📝 Enhanced Logging**
+- Tool execution visibility improvements in `executor.py` and `agent.py`
+- Shows command being executed, execution time, and data size
+- Better debugging and monitoring capabilities
+
+### Changed
+- **Documentation structure**: Moved from flat root structure to organized `docs/` hierarchy
+- **Test structure**: Organized from scattered root files to categorized `tests/` directory
+- **README.md**: Streamlined to focus on essentials, moved detailed content to guides
+- **Version**: Updated to 2.1.0 in `groqqy/__init__.py`, `setup.py`, and `pyproject.toml`
+
+### Improved
+- **Project cleanliness**: 43% reduction in root-level documentation (2,691 lines archived)
+- **Navigation**: Clear documentation paths and comprehensive guides
+- **Developer experience**: Makefile for common tasks, better test organization
+- **First-time user experience**: Cleaner README, organized examples with index
+- **Professional appearance**: Consistent structure following Python best practices
+
+### Documentation
+- `docs/USER_GUIDE.md`: Planned comprehensive usage guide
+- `docs/ARCHITECTURE.md`: Moved and enhanced with export system details
+- `docs/TEACHING_GUIDE.md`: Updated with new features
+- `docs/guides/CONTAINER_TESTING.md`: Complete container testing guide
+- `docs/guides/QUICK_START_NEW_FEATURES.md`: v2.1 feature quick start
+- `docs/guides/REVEAL_LEARNING_DEMO.md`: Self-discovery demonstration
+- `docs/SELF_DISCOVERY_SEED_PROMPT.md`: Comprehensive self-discovery guide
+- `docs/REVEAL_SEED_PROMPT_MVP.md`: Minimal 11-line seed prompt
+- `examples/README.md`: Complete examples index with usage and patterns
+
+### Technical Details
+- All exports preserve tool calls: function names, JSON arguments, and complete results
+- HTML export uses embedded CSS (no external dependencies, works offline)
+- Self-discovery pattern demonstrates meta-learning (agent learns how to learn)
+- Container tests prove reproducibility and validate standalone operation
+- Makefile supports modern Python dev workflow (black, flake8, mypy, pytest)
+- pyproject.toml enables modern pip installation: `pip install -e ".[dev]"`
+
+### Metrics
+- **Code quality**: Excellent (clean structure, type hints, docstrings, no TODOs)
+- **Documentation**: Reduced from 6,209 to ~3,500 lines at root (43% reduction)
+- **Test organization**: 100% of tests now categorized in `tests/` directory
+- **Examples**: 7 examples with comprehensive README and usage patterns
+- **Project structure**: Professional, follows Python packaging best practices
+
 ## [2.0.0] - 2025-11-28
 
 ### Added
