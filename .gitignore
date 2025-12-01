@@ -45,3 +45,15 @@ Thumbs.db
 # Groqqy specific
 logs/
 *.jsonl
+
+# Test outputs
+test_output*/
+*_output/
+reveal_learning_output/
+
+# Container artifacts
+.container/
+
+# Temporary files
+*.tmp
+*.bak
