@@ -62,10 +62,28 @@ LOG_DIR.mkdir(exist_ok=True, parents=True)
 # Console output (human-readable, colorized for development)
 # ============================================================================
 
+def console_formatter(record):
+    """Custom formatter that includes tool info."""
+    base = "<green>{time:HH:mm:ss}</green> | <level>{level: <8}</level> | <cyan>{extra[component]}</cyan> | <level>{message}</level>"
+
+    # Add tool info if present
+    if "tool" in record["extra"]:
+        base += " | <yellow>tool={extra[tool]}</yellow>"
+
+    # Add result info if present
+    if "result_length" in record["extra"]:
+        base += " | <blue>{extra[result_length]} chars</blue>"
+
+    # Add duration if present
+    if "duration_ms" in record["extra"]:
+        base += " | <magenta>{extra[duration_ms]:.0f}ms</magenta>"
+
+    return base + "\n"
+
 logger.add(
     sys.stderr,
     level=LOG_LEVEL,
-    format="<green>{time:HH:mm:ss}</green> | <level>{level: <8}</level> | <cyan>{extra[component]}</cyan> | <level>{message}</level>",
+    format=console_formatter,
     colorize=True,
     filter=lambda record: "component" in record["extra"],  # Only log if component is set
 )

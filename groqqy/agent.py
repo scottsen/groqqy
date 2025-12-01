@@ -124,9 +124,25 @@ class Agent:
                 num_tools = len(execution_result.tool_calls)
                 tool_calls_made += num_tools
 
+                # Show what tools are about to be executed
+                tool_summaries = []
+                for tc in execution_result.tool_calls:
+                    name = tc['function']['name']
+                    args = tc['function']['arguments']
+                    # Parse args to show command if it's run_command
+                    try:
+                        import json
+                        args_dict = json.loads(args) if isinstance(args, str) else args
+                        if name == "run_command" and "command" in args_dict:
+                            tool_summaries.append(f"{name}('{args_dict['command']}')")
+                        else:
+                            tool_summaries.append(name)
+                    except:
+                        tool_summaries.append(name)
+
                 self.log.info(f"Executing {num_tools} tool(s)",
                              iteration=iteration,
-                             tools=[tc['function']['name'] for tc in execution_result.tool_calls])
+                             tools=tool_summaries)
 
                 # Add tool calls to conversation
                 self.conversation.add_tool_calls(response.text, execution_result.tool_calls)

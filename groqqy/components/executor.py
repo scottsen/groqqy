@@ -60,6 +60,16 @@ class ToolExecutor:
 
         # Execute tool
         start = time.time()
+
+        # Create human-readable description of what's being executed
+        if name == "run_command" and "command" in args:
+            exec_desc = f"{name}('{args['command']}')"
+        else:
+            # Show first few args for other tools
+            arg_preview = ", ".join(f"{k}={repr(v)[:50]}" for k, v in list(args.items())[:2])
+            exec_desc = f"{name}({arg_preview})"
+
+        self.log.info("Executing tool", tool=exec_desc)
         self.log.debug("Tool execution started", tool=name, args=args)
 
         try:
@@ -67,10 +77,13 @@ class ToolExecutor:
             result_str = str(result)
 
             elapsed_ms = (time.time() - start) * 1000
+            result_preview = result_str[:100] + "..." if len(result_str) > 100 else result_str
+
             self.log.info("Tool execution succeeded",
                          tool=name,
                          duration_ms=round(elapsed_ms, 2),
-                         result_length=len(result_str))
+                         result_length=len(result_str),
+                         result_preview=result_preview)
 
             return result_str
 
