@@ -7,6 +7,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.2.0] - 2025-12-02
+
+### Fixed
+- **Optional type handling in schema generation**: `_map_type()` now correctly handles `Optional[T]` and `Union[T, None]` types from Python's typing module, including nested generics like `Optional[List[str]]`
+- Schema generation now properly marks optional parameters as not required while preserving correct type information
+
+### Added
+- **Line range support in read_file**: `read_file()` now accepts optional `start_line` and `end_line` parameters for reading specific sections of files
+  - `read_file("file.txt", start_line=10, end_line=20)`: Read lines 10-20
+  - `read_file("file.txt", start_line=50)`: Read from line 50 to end
+  - `read_file("file.txt", end_line=100)`: Read first 100 lines
+  - Maintains backwards compatibility (no parameters = full file read)
+  - Includes bounds validation and improved error messages
+
+### Testing
+- Added comprehensive test suite for Optional type handling (7 tests)
+- Added test suite for read_file line ranges (6 tests)
+- Added test suite for tool schema generation with Optional parameters (2 tests)
+- All 15 tests passing
+
+### Impact
+- **Unblocks Scout document analysis tools**: Can now extract specific sections from large files efficiently
+- **Enables clean tool APIs**: Optional parameters work correctly with Groq API
+- **Foundation for v2.x enhancements**: Type system improvements enable future tools
+
 ## [2.1.0] - 2025-12-01
 
 ### Added

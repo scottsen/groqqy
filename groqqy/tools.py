@@ -5,13 +5,48 @@ Tools that Groqqy can use
 import subprocess
 import shlex
 from pathlib import Path
+from typing import Optional
 
 
-def read_file(file_path: str) -> str:
-    """Read and return contents of a file."""
+def read_file(file_path: str, start_line: Optional[int] = None,
+              end_line: Optional[int] = None) -> str:
+    """
+    Read and return contents of a file.
+
+    Args:
+        file_path: Path to file
+        start_line: Starting line number (1-indexed), None = from beginning
+        end_line: Ending line number (inclusive), None = to end
+
+    Returns:
+        File contents or specified line range
+
+    Examples:
+        read_file("file.txt")              # Full file
+        read_file("file.txt", 10, 20)      # Lines 10-20
+        read_file("file.txt", start_line=50)  # From line 50 to end
+        read_file("file.txt", end_line=100)   # First 100 lines
+    """
     try:
         with open(file_path, 'r') as f:
-            return f.read()
+            # Fast path for full file read
+            if start_line is None and end_line is None:
+                return f.read()
+
+            # Line range reading
+            lines = f.readlines()
+            start = (start_line - 1) if start_line else 0
+            end = end_line if end_line else len(lines)
+
+            # Validate bounds
+            if start < 0:
+                start = 0
+            if end > len(lines):
+                end = len(lines)
+
+            return ''.join(lines[start:end])
+    except FileNotFoundError:
+        return f"Error: File not found: {file_path}"
     except Exception as e:
         return f"Error reading file: {e}"
 
