@@ -35,7 +35,9 @@ class Groqqy:
         model: str = "llama-3.1-8b-instant",
         tools: Optional[ToolRegistry] = None,
         system_instruction: Optional[str] = None,
-        max_iterations: int = 10
+        max_iterations: int = 10,
+        temperature: float = 0.5,
+        top_p: float = 0.65
     ):
         """
         Initialize Groqqy.
@@ -45,6 +47,8 @@ class Groqqy:
             tools: ToolRegistry (uses defaults if not provided)
             system_instruction: Custom system prompt (uses default if not provided)
             max_iterations: Maximum agent loop iterations
+            temperature: Sampling temperature (0.0-2.0, default 0.5 for tool calling)
+            top_p: Nucleus sampling parameter (0.0-1.0, default 0.65 for tool calling)
         """
         # Session tracking
         self.session_id = str(uuid.uuid4())[:8]
@@ -56,7 +60,9 @@ class Groqqy:
         # Provider (LLM backend)
         self.provider = GroqProvider(
             model=model,
-            system_instruction=system_instruction or self._default_instruction()
+            system_instruction=system_instruction or self._default_instruction(),
+            temperature=temperature,
+            top_p=top_p
         )
 
         # Tool registry

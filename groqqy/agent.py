@@ -161,13 +161,18 @@ class Agent:
             # Strategy says we're done (no local execution needed)
             self.conversation.add_assistant(response.text)
 
+            # DEBUG: Log what we're returning
+            final_response = execution_result.content or response.text
             self.log.info("Agent run completed",
                          iterations=iteration,
                          tool_calls_made=tool_calls_made,
-                         total_cost=self.tracker.get_total())
+                         total_cost=self.tracker.get_total(),
+                         execution_result_content=execution_result.content[:100] if execution_result.content else None,
+                         response_text=response.text[:100] if response.text else None,
+                         final_response=final_response[:100] if final_response else None)
 
             return AgentResult(
-                response=execution_result.content or response.text,
+                response=final_response,
                 iterations=iteration,
                 total_cost=self.tracker.get_total(),
                 tool_calls_made=tool_calls_made,

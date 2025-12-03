@@ -18,10 +18,15 @@ class GroqProvider(Provider):
         "llama-4-scout": {"input": 0.11, "output": 0.34},
     }
 
-    def __init__(self, model: str = "llama-3.1-8b-instant", system_instruction: str = None):
+    def __init__(self, model: str = "llama-3.1-8b-instant",
+                 system_instruction: str = None,
+                 temperature: float = 0.5,
+                 top_p: float = 0.65):
         self.model = model
         self.api_key = self._get_api_key()
         self.system_message = self._create_system_message(system_instruction)
+        self.temperature = temperature
+        self.top_p = top_p
 
     def chat(self, messages: List[Dict], tools: List = None) -> LLMResponse:
         payload = self._build_payload(messages, tools)
@@ -50,7 +55,12 @@ class GroqProvider(Provider):
 
     def _build_payload(self, messages: List[Dict], tools: List) -> Dict:
         full_messages = self._add_system_message(messages)
-        payload = {"model": self.model, "messages": full_messages}
+        payload = {
+            "model": self.model,
+            "messages": full_messages,
+            "temperature": self.temperature,
+            "top_p": self.top_p
+        }
 
         if tools:
             payload["tools"] = tools
