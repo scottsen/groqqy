@@ -93,6 +93,40 @@ bot.save_conversation("session.html")  # Auto-styled HTML
 bot.save_conversation("session.md")     # Clean markdown
 ```
 
+## Model Selection for Tool Calling
+
+When using Groqqy for agentic workflows with tool calling, **model selection matters**:
+
+### Recommended Models (2025)
+
+| Model | Tool Calling | Speed | Cost | Recommendation |
+|-------|--------------|-------|------|----------------|
+| **llama-3.3-70b-versatile** | ✅ Excellent | Fast | $0.001/query | **Best for production** |
+| **llama-4-scout** | ✅ Excellent | Fast | $0.0004/query | Optimized for tool use |
+| **llama-3.1-8b-instant** | ⚠️ Inconsistent | Fastest | $0.0003/query | Testing only |
+
+### Known Issue: `tool_use_failed` Errors
+
+**Symptom**: `RuntimeError: Groq API error (400): tool_use_failed`
+
+**Cause**: Some models (especially 8b) occasionally generate tool calls wrapped in XML tags (`<function=name>{...}</function>`) instead of pure JSON. Groq's API rejects this format.
+
+**Solution**: Use `llama-3.3-70b-versatile` for production tool calling:
+
+```python
+from groqqy import Groqqy
+
+# Recommended for production
+bot = Groqqy(model="llama-3.3-70b-versatile")
+
+# Cheaper but less reliable
+bot = Groqqy(model="llama-3.1-8b-instant")  # May fail on tool calls
+```
+
+**Cost trade-off**: 70b model costs ~3x more ($0.001 vs $0.0003 per query) but provides consistent tool calling. **Still 100x cheaper than Claude.**
+
+**See also**: [Groq Tool Use Documentation](https://console.groq.com/docs/tool-use) | [Supported Models](https://console.groq.com/docs/models)
+
 ### Custom Tools
 
 ```python

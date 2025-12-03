@@ -70,8 +70,26 @@ class GroqProvider(Provider):
         )
 
         if not response.ok:
-            error_detail = response.json() if response.text else "No error details"
-            raise RuntimeError(f"Groq API error ({response.status_code}): {error_detail}")
+            error_data = response.json() if response.text else {}
+
+            # Enhanced error handling for tool_use_failed (400 errors)
+            if response.status_code == 400:
+                error_obj = error_data.get("error", {})
+                error_message = error_obj.get("message", "Unknown error")
+
+                # Check for tool use failures - show what the model generated
+                if "tool_use_failed" in error_message.lower() or error_obj.get("failed_generation"):
+                    failed_gen = error_obj.get("failed_generation", "Not provided")
+                    raise RuntimeError(
+                        f"Groq API error (400): tool_use_failed\n"
+                        f"Model '{self.model}' generated malformed tool call format.\n"
+                        f"Generated: {failed_gen}\n"
+                        f"Hint: Some models (especially 8b) may wrap JSON in XML tags.\n"
+                        f"      Try 'llama-3.3-70b-versatile' for more reliable tool calling."
+                    )
+
+            # Generic error fallback
+            raise RuntimeError(f"Groq API error ({response.status_code}): {error_data}")
 
         return response.json()
 
