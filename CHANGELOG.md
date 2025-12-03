@@ -7,6 +7,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.3.0] - 2025-12-03
+
+### Changed
+- **Build system modernization**: Removed `setup.py` (redundant with `pyproject.toml`)
+  - Now uses modern Python packaging exclusively (PEP 517/518)
+  - `pyproject.toml` is the single source of truth for all project metadata
+  - Simpler, cleaner build process aligned with Python 3.8+ standards
+- **Documentation improvements**: Added comprehensive `RELEASE.md` with 6-phase release process
+  - Includes rollback procedures, troubleshooting guide, and monitoring instructions
+  - Documents PyPI Trusted Publishing setup and best practices
+  - Complete version management and semantic versioning guidelines
+
+### Fixed
+- **Removed TIA-specific references**: Groqqy is now fully standalone for public use
+  - Removed outdated TIA prerequisite from `CONTRIBUTING.md`
+  - Replaced internal TIA documentation paths with public Groq API documentation
+  - All examples, code, and documentation are now TIA-independent
+  - Zero proprietary dependencies - works out of the box for all users
+
+### Impact
+- **Truly standalone**: External contributors need zero knowledge of TIA
+- **Modern packaging**: Aligned with current Python best practices (PEP 517/518)
+- **Better documentation**: Complete release process for maintainers
+- **Public-ready**: Clean, professional library suitable for open-source use
+
 ## [2.2.2] - 2025-12-03
 
 ### Added
