@@ -272,66 +272,51 @@ Contributors will be added to:
 
 ## Releasing
 
-**Releases are fully automated** via GitHub Actions using PyPI Trusted Publishing.
+**For maintainers only.** See [RELEASE.md](RELEASE.md) for the complete release process.
 
-### Quick Release
+### Quick Reference
 
 ```bash
-# Bump version in groqqy/__init__.py and setup.py
-# Update CHANGELOG.md with changes
+# 1. Update version
+# Edit: pyproject.toml (line 7), groqqy/__init__.py (line 1)
+# Update: CHANGELOG.md
 
-# Commit changes
-git add groqqy/__init__.py setup.py CHANGELOG.md
-git commit -m "chore: bump version to X.Y.Z"
-git push origin main
+# 2. Test
+python run_unit_tests.py
+reveal groqqy/*.py --check
 
-# Create release (triggers auto-publish to PyPI)
+# 3. Commit & Tag
+git add pyproject.toml groqqy/__init__.py CHANGELOG.md [other files]
+git commit -m "feat(vX.Y.Z): description"
+git tag -a vX.Y.Z -m "Version X.Y.Z - description"
+
+# 4. Push
+git push origin main && git push origin vX.Y.Z
+
+# 5. Create Release (triggers PyPI publish)
 gh release create vX.Y.Z \
   --title "vX.Y.Z - Description" \
-  --notes "See CHANGELOG.md for details"
-
-# Done! Package publishes to PyPI automatically
+  --notes-file <(sed -n '/## \[X.Y.Z\]/,/## \[/p' CHANGELOG.md | head -n -1)
 ```
 
-### How It Works
+### Version Management
 
-1. **Create GitHub Release** → Triggers workflow
-2. **GitHub Actions** → Builds package
-3. **PyPI Trusted Publishing** → Publishes (no tokens!)
-4. **Users can install** → `pip install groqqy`
+**Modern Python (v2.2.2+):**
+- Single source: `pyproject.toml` (PEP 517/518)
+- Runtime check: `groqqy/__init__.py`
+- No setup.py needed (removed in v2.2.2)
 
-**Workflow:** `.github/workflows/publish.yml`
-
-**Security:** Uses PyPI Trusted Publishing (OIDC) - no API tokens needed!
-
-### Version Numbering
-
-Follow [Semantic Versioning](https://semver.org/):
-
-- **MAJOR.MINOR.PATCH** (e.g., `2.0.1`)
+**Semantic Versioning:**
 - **MAJOR** - Breaking changes
 - **MINOR** - New features (backward compatible)
 - **PATCH** - Bug fixes
 
-**Examples:**
-- `2.0.0` → `2.0.1` - Bug fix
-- `2.0.1` → `2.1.0` - New feature (e.g., new tool type)
-- `2.1.0` → `3.0.0` - Breaking API change
+### Complete Documentation
 
-### Pre-Release Checklist
-
-- [ ] Tests pass: `python -m pytest tests/`
-- [ ] Examples work: `python examples/*.py`
-- [ ] Version bumped in `groqqy/__init__.py` and `setup.py`
-- [ ] CHANGELOG.md updated with changes
-- [ ] Documentation reflects new features
-
-### Troubleshooting
-
-**See:** `.github/workflows/README.md` for detailed setup and troubleshooting.
-
-**Common issues:**
-- Trusted publishing not configured → See workflow README
-- Build fails → Check GitHub Actions logs: `gh run list --limit 5`
+See [RELEASE.md](RELEASE.md) for:
+- Detailed 6-phase process
+- Rollback procedures
+- Troubleshooting guide
+- PyPI Trusted Publishing setup
 
 Thank you for contributing! 🚀

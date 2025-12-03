@@ -1,75 +1,135 @@
 # GitHub Actions Workflows
 
+**For complete release documentation, see [RELEASE.md](../RELEASE.md) in the repository root.**
+
 ## PyPI Publishing (`publish.yml`)
 
-Automatically publishes to PyPI when a new GitHub release is created.
+Automatically publishes Groqqy to PyPI when a GitHub Release is published.
 
-### Setup: PyPI Trusted Publishing (Recommended)
+### Quick Start
 
-**Secure, no tokens needed!**
+**Trigger a release:**
+```bash
+gh release create vX.Y.Z \
+  --title "vX.Y.Z - Description" \
+  --notes-file <(sed -n '/## \[X.Y.Z\]/,/## \[/p' CHANGELOG.md | head -n -1)
+```
 
-1. **Go to PyPI**: https://pypi.org/manage/account/publishing/
-2. **Add a new publisher**:
-   - PyPI Project Name: `groqqy`
-   - Owner: `scottsen`
-   - Repository: `groqqy`
-   - Workflow name: `publish.yml`
-   - Environment name: `pypi`
-3. **Save**
+**Monitor workflow:**
+```bash
+gh run watch
+```
 
-That's it! Next release will auto-publish.
-
-### Alternative: API Token Method
-
-If you prefer using a token instead:
-
-1. **Generate PyPI API token**: https://pypi.org/manage/account/token/
-2. **Add to GitHub Secrets**:
-   - Go to: https://github.com/scottsen/groqqy/settings/secrets/actions
-   - Name: `PYPI_API_TOKEN`
-   - Value: `pypi-...` (your token)
-3. **Update workflow**: Change the publish step to:
-   ```yaml
-   - name: Publish to PyPI
-     uses: pypa/gh-action-pypi-publish@release/v1
-     with:
-       password: ${{ secrets.PYPI_API_TOKEN }}
-   ```
+**Verify publish:**
+```bash
+pip install --upgrade groqqy
+python -c "import groqqy; print(groqqy.__version__)"
+```
 
 ### How It Works
 
-1. Create a new release on GitHub (tag like `v2.0.1`)
-2. Workflow automatically:
-   - Checks out code
-   - Sets up Python
+1. **You create GitHub Release** (tag like `vX.Y.Z`)
+2. **Workflow triggers automatically:**
+   - Checks out code at release tag
+   - Sets up Python 3.11
+   - Installs build tools
    - Builds package (`python -m build`)
-   - Publishes to PyPI
-3. Done! Users can `pip install groqqy`
+   - Publishes to PyPI via Trusted Publishing
+3. **Done!** Package available on PyPI in 2-3 minutes
 
-### Testing
+### PyPI Trusted Publishing Setup
 
-To test without publishing:
+**One-time configuration (already done):**
 
-```bash
-# Build locally to verify
-python -m build
+1. Go to: https://pypi.org/manage/account/publishing/
+2. Add publisher:
+   - **PyPI Project**: `groqqy`
+   - **Owner**: `scottsen`
+   - **Repository**: `groqqy`
+   - **Workflow**: `publish.yml`
+   - **Environment**: `pypi`
 
-# Check distribution
-twine check dist/*
-
-# Test upload to TestPyPI first (optional)
-twine upload --repository testpypi dist/*
-```
+**Benefits:**
+- ✅ No API tokens to manage
+- ✅ More secure (OIDC-based)
+- ✅ Automatic credential rotation
+- ✅ Works only from GitHub Actions
 
 ### Workflow Triggers
 
-- ✅ **Release published** - Main trigger
-- ❌ Draft releases - Not triggered
-- ❌ Pre-releases - Not triggered (can enable if needed)
+**Triggers on:**
+- ✅ GitHub Release published
 
-To publish:
+**Does NOT trigger on:**
+- ❌ Just pushing a tag
+- ❌ Draft releases
+- ❌ Pre-releases (can enable if needed)
+- ❌ Direct commits to main
+
+### Local Testing
+
+Test the build process locally before releasing:
+
 ```bash
-gh release create v2.0.1 --title "v2.0.1 - Bug fixes" --notes "..."
+# Clean previous builds
+rm -rf dist/ build/ *.egg-info
+
+# Build package
+python -m build
+
+# Verify distribution
+twine check dist/*
+
+# Inspect contents
+tar -tzf dist/groqqy-X.Y.Z.tar.gz
 ```
 
-Workflow runs automatically, package appears on PyPI within 2-3 minutes.
+**Optional: Test on TestPyPI first**
+```bash
+twine upload --repository testpypi dist/*
+pip install --index-url https://test.pypi.org/simple/ groqqy
+```
+
+### Monitoring & Troubleshooting
+
+**View recent runs:**
+```bash
+gh run list --limit 10
+```
+
+**Watch current run:**
+```bash
+gh run watch
+```
+
+**View failed run logs:**
+```bash
+gh run list --limit 5
+gh run view <run-id> --log-failed
+```
+
+**Common issues:**
+- **"File already exists"** → Version already on PyPI (can't overwrite)
+- **Build fails** → Check Python syntax, dependencies in pyproject.toml
+- **Auth fails** → Verify Trusted Publishing configuration
+
+See [RELEASE.md](../RELEASE.md) for detailed troubleshooting.
+
+### Version Management (v2.2.2+)
+
+**Modern approach (pyproject.toml only):**
+
+Update version in 2 places:
+1. `pyproject.toml` (line 7): `version = "X.Y.Z"`
+2. `groqqy/__init__.py` (line 1): `__version__ = "X.Y.Z"`
+
+**Note:** No setup.py needed (removed in v2.2.2, pyproject.toml is sufficient per PEP 517/518)
+
+### Resources
+
+- **Complete Release Guide**: [RELEASE.md](../RELEASE.md)
+- **Workflow File**: `publish.yml`
+- **Package on PyPI**: https://pypi.org/project/groqqy/
+- **Workflow Runs**: https://github.com/scottsen/groqqy/actions
+- **PEP 517** (Build System): https://peps.python.org/pep-0517/
+- **PEP 518** (pyproject.toml): https://peps.python.org/pep-0518/
