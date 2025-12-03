@@ -16,16 +16,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Passes `tools=None` to Groq API (no tool schemas sent)
   - Strategy layer gracefully handles None tools with LocalToolStrategy fallback
   - Prevents default tool registry creation when explicitly disabled
+- **Sentinel pattern for backwards compatibility**: Implemented `_USE_DEFAULTS` sentinel object to distinguish between omitted parameters and explicit `None`
+  - `Groqqy()` → creates default tool registry (backwards compatible)
+  - `Groqqy(tools=None)` → no tools (explicit disable)
+  - `Groqqy(tools=registry)` → uses custom registry
+- **Comprehensive test coverage**: Added Test Suite 4 with 5 new tests for tools=None functionality (20/20 tests passing)
 
 ### Fixed
-- **Bare except clause in agent.py**: Replaced overly broad `except:` with specific exception types (`json.JSONDecodeError`, `KeyError`, `TypeError`, `AttributeError`) for safer error handling that doesn't catch SystemExit
-- **PEP 8 compliance**: Fixed long lines (>88 chars) in agent.py and tool.py for better code readability
+- **Critical security fixes**: Replaced 2 bare `except:` clauses in `exporter.py` (lines 74, 170) with specific exception types (`json.JSONDecodeError`, `TypeError`, `AttributeError`)
+  - Prevents accidentally catching `SystemExit`, `KeyboardInterrupt`, and other system exceptions
+  - Makes debugging and shutdown more reliable
+- **PEP 8 compliance**: Fixed 30 long line violations (>88 chars) across 5 files:
+  - `cli.py` (2 issues) - Multi-line strings with parentheses
+  - `log.py` (2 issues) - Break format strings into parts
+  - `executor.py` (3 issues) - Extract intermediate variables
+  - `exporter.py` (18 issues) - Combined strategies for complex formatting
+  - `groq.py` (5 issues) - Extract variables, multi-line f-strings
+- **Code quality**: All modules now pass `reveal --check` with zero critical issues
+
+### Changed
+- **Build system modernization**: Removed `setup.py` (redundant with `pyproject.toml`)
+  - Now uses modern Python packaging (PEP 517/518)
+  - `pyproject.toml` is single source of truth for project metadata
+- **Release process**: Added comprehensive `RELEASE.md` documentation
+  - 6-phase release workflow with safety checkpoints
+  - Rollback procedures and troubleshooting guide
+  - PyPI Trusted Publishing documentation
 
 ### Impact
 - **Enables clean fact extraction**: Scout v8 Pass 1 uses `--no-tools` for structured data extraction without tool-calling loops
 - **3x faster generation**: Pure LLM mode with 8b models skips tool overhead
 - **More robust error handling**: Won't accidentally catch system signals like KeyboardInterrupt
-- **Cleaner codebase**: All files now pass reveal --check with zero issues
+- **Production-ready**: Zero security issues, full PEP 8 compliance, 100% test pass rate
+- **Modern packaging**: Aligned with current Python best practices (PEP 517/518)
 
 ## [2.2.1] - 2025-12-02
 
