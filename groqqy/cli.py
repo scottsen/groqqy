@@ -56,7 +56,10 @@ Configuration:
     parser.add_argument(
         '--export',
         metavar='FILE',
-        help='Export conversation on exit (format auto-detected from extension: .md or .html)'
+        help=(
+            'Export conversation on exit '
+            '(format auto-detected from extension: .md or .html)'
+        )
     )
 
     return parser.parse_args()
@@ -174,7 +177,10 @@ def main():
                     format_type = 'markdown'
 
                 bot.save_conversation(args.export, format=format_type)
-                print(f"✅ Conversation exported to {args.export} ({format_type})", file=sys.stderr)
+                export_msg = (
+                    f"✅ Conversation exported to {args.export} ({format_type})"
+                )
+                print(export_msg, file=sys.stderr)
             except Exception as e:
                 print(f"❌ Failed to export conversation: {e}", file=sys.stderr)
 

@@ -16,6 +16,9 @@ from .tool import ToolRegistry, create_default_registry
 from .log import get_logger
 from .components.exporter import ConversationExporter
 
+# Sentinel for distinguishing "not provided" from "explicitly None"
+_USE_DEFAULTS = object()
+
 
 class Groqqy:
     """
@@ -33,7 +36,7 @@ class Groqqy:
     def __init__(
         self,
         model: str = "llama-3.1-8b-instant",
-        tools: Optional[ToolRegistry] = None,
+        tools: Optional[ToolRegistry] = _USE_DEFAULTS,
         system_instruction: Optional[str] = None,
         max_iterations: int = 10,
         temperature: float = 0.5,
@@ -44,7 +47,7 @@ class Groqqy:
 
         Args:
             model: Groq model name
-            tools: ToolRegistry (uses defaults if not provided)
+            tools: ToolRegistry, None to disable tools, or omit for defaults
             system_instruction: Custom system prompt (uses default if not provided)
             max_iterations: Maximum agent loop iterations
             temperature: Sampling temperature (0.0-2.0, default 0.5 for tool calling)
@@ -65,8 +68,16 @@ class Groqqy:
             top_p=top_p
         )
 
-        # Tool registry
-        self.tools = tools or create_default_registry()
+        # Tool registry (distinguish None from omitted for backwards compat)
+        if tools is _USE_DEFAULTS:
+            # Parameter omitted - use defaults (backwards compatible)
+            self.tools = create_default_registry()
+        elif tools is None:
+            # Explicitly None - disable tools (--no-tools mode)
+            self.tools = None
+        else:
+            # Custom ToolRegistry provided
+            self.tools = tools
 
         # Agent (does the heavy lifting)
         self.agent = Agent(
@@ -76,9 +87,20 @@ class Groqqy:
             logger=self.log
         )
 
+        tool_info = {}
+        if self.tools is not None:
+            tool_info = {
+                "tool_count": len(self.tools),
+                "tools": self.tools.list_names()
+            }
+        else:
+            tool_info = {
+                "tool_count": 0,
+                "tools": []
+            }
+
         self.log.info("Groqqy initialized",
-                     tool_count=len(self.tools),
-                     tools=self.tools.list_names(),
+                     **tool_info,
                      max_iterations=max_iterations,
                      has_custom_instruction=bool(system_instruction))
 

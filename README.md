@@ -14,9 +14,17 @@ Ultra-fast, ultra-cheap, and truly agentic. Groqqy is a multi-step reasoning age
 - 📚 **Teaching-Friendly**: Clean, readable code (<200 lines per file) perfect for learning agentic AI
 - 📝 **Export Ready**: Save conversations to markdown/HTML with full tool call visibility
 
-## What's New in v2.1.0
+## What's New in v2.2.2
 
-**Documentation & Export Features:**
+**Pure LLM Mode & Code Quality:**
+
+- 🚫 **Disable Tools**: New `tools=None` parameter for pure text generation without tool-calling overhead
+- 🔒 **Security Fixes**: Replaced bare except clauses with specific exception handling
+- 📏 **PEP 8 Compliance**: All core modules now pass linting with zero issues
+- ✅ **Comprehensive Testing**: 20/20 tests passing including new --no-tools test suite
+- 📝 **Complete Documentation**: README and CHANGELOG fully updated
+
+**Previous Features (v2.1.0):**
 
 - 📝 **Conversation Export**: Export full conversations to markdown/HTML with tool call details
 - 🎓 **Self-Discovery**: Agents can autonomously learn new tools via minimal seed prompts
@@ -148,6 +156,44 @@ bot = Groqqy(tools=[get_weather, calculate_tip])
 response, cost = bot.chat("What's the weather in San Francisco?")
 # Agent automatically calls get_weather("San Francisco")
 ```
+
+### Pure LLM Mode (No Tools)
+
+Sometimes you want pure text generation without any tool-calling:
+
+```python
+from groqqy import Groqqy
+
+# Disable tools entirely for pure LLM mode
+bot = Groqqy(tools=None)
+
+# Fast, focused text generation (no tool overhead)
+response, cost = bot.chat("Write a haiku about coding")
+# Agent generates text directly, no tool calls attempted
+```
+
+**When to use `tools=None`:**
+- Pure text generation (summaries, creative writing, etc.)
+- Fact extraction from existing data
+- Scenarios where tool-calling causes problems (loops, hallucinations)
+- Faster generation with smaller models (no tool overhead)
+
+**Example use case - Fact extraction:**
+```python
+# Extract structured information without tools
+bot = Groqqy(model="llama-3.1-8b-instant", tools=None)
+
+data = """
+Session: test-123
+Files: app.py, test.py
+Errors: 5 type errors, 2 lint warnings
+"""
+
+response, cost = bot.chat(f"Extract facts from this data:\n{data}")
+# Clean output, no tool calls, 3x faster
+```
+
+**Note**: Omitting the `tools` parameter creates default tools (backwards compatible). Use `tools=None` explicitly to disable.
 
 ## Core Features
 

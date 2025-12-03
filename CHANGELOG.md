@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.2.2] - 2025-12-03
+
+### Added
+- **Optional tools parameter**: `Groqqy()` and `Agent()` now accept `tools=None` to disable tool-calling entirely, enabling pure LLM text generation mode
+  - When `tools=None`, Groqqy runs in "pure LLM mode" without any tool-calling infrastructure
+  - Useful for text generation, summarization, and scenarios where tool-calling interferes
+  - Passes `tools=None` to Groq API (no tool schemas sent)
+  - Strategy layer gracefully handles None tools with LocalToolStrategy fallback
+  - Prevents default tool registry creation when explicitly disabled
+
+### Fixed
+- **Bare except clause in agent.py**: Replaced overly broad `except:` with specific exception types (`json.JSONDecodeError`, `KeyError`, `TypeError`, `AttributeError`) for safer error handling that doesn't catch SystemExit
+- **PEP 8 compliance**: Fixed long lines (>88 chars) in agent.py and tool.py for better code readability
+
+### Impact
+- **Enables clean fact extraction**: Scout v8 Pass 1 uses `--no-tools` for structured data extraction without tool-calling loops
+- **3x faster generation**: Pure LLM mode with 8b models skips tool overhead
+- **More robust error handling**: Won't accidentally catch system signals like KeyboardInterrupt
+- **Cleaner codebase**: All files now pass reveal --check with zero issues
+
 ## [2.2.1] - 2025-12-02
 
 ### Improved

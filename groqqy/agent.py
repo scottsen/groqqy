@@ -65,14 +65,19 @@ class Agent:
         self.max_iterations = max_iterations
         self.log = logger or get_logger("agent")
 
-        # Auto-detect strategy based on tool types
-        self.strategy = strategy or detect_strategy(tools.to_schemas())
+        # Auto-detect strategy based on tool types (or use default if no tools)
+        if tools is not None:
+            self.strategy = strategy or detect_strategy(tools.to_schemas())
+        else:
+            # No tools - strategy won't be used, but we need a valid object
+            from .strategy import LocalToolStrategy
+            self.strategy = LocalToolStrategy()
 
         self.log.debug(f"Agent initialized with {self.strategy.describe()}")
 
         # Components (composable!)
         self.conversation = ConversationManager()
-        self.executor = ToolExecutor(tools, logger)
+        self.executor = ToolExecutor(tools, logger) if tools is not None else None
         self.tracker = CostTracker()
 
     def run(self, prompt: str) -> AgentResult:
@@ -114,9 +119,10 @@ class Agent:
             self.tracker.add(cost, {"iteration": iteration})
 
             # ACT: Let strategy decide how to handle response
+            tools_schemas = self.tools.to_schemas() if self.tools is not None else []
             execution_result = self.strategy.handle_response(
                 response,
-                self.tools.to_schemas()
+                tools_schemas
             )
 
             if execution_result.needs_continuation:
@@ -137,7 +143,7 @@ class Agent:
                             tool_summaries.append(f"{name}('{args_dict['command']}')")
                         else:
                             tool_summaries.append(name)
-                    except:
+                    except (json.JSONDecodeError, KeyError, TypeError, AttributeError):
                         tool_summaries.append(name)
 
                 self.log.info(f"Executing {num_tools} tool(s)",
@@ -145,7 +151,9 @@ class Agent:
                              tools=tool_summaries)
 
                 # Add tool calls to conversation
-                self.conversation.add_tool_calls(response.text, execution_result.tool_calls)
+                self.conversation.add_tool_calls(
+                    response.text, execution_result.tool_calls
+                )
 
                 # Execute all tools
                 for tool_call in execution_result.tool_calls:
@@ -163,13 +171,19 @@ class Agent:
 
             # DEBUG: Log what we're returning
             final_response = execution_result.content or response.text
+            exec_content = (
+                execution_result.content[:100]
+                if execution_result.content else None
+            )
+            resp_text = response.text[:100] if response.text else None
+            final_resp = final_response[:100] if final_response else None
             self.log.info("Agent run completed",
                          iterations=iteration,
                          tool_calls_made=tool_calls_made,
                          total_cost=self.tracker.get_total(),
-                         execution_result_content=execution_result.content[:100] if execution_result.content else None,
-                         response_text=response.text[:100] if response.text else None,
-                         final_response=final_response[:100] if final_response else None)
+                         execution_result_content=exec_content,
+                         response_text=resp_text,
+                         final_response=final_resp)
 
             return AgentResult(
                 response=final_response,
@@ -198,9 +212,11 @@ class Agent:
         Returns:
             LLMResponse from provider
         """
+        # Pass None for tools if no tool registry
+        tools_schemas = self.tools.to_schemas() if self.tools is not None else None
         return self.provider.chat(
             messages=self.conversation.get_history(),
-            tools=self.tools.to_schemas()
+            tools=tools_schemas
         )
 
     def reset(self):

@@ -38,8 +38,12 @@ class GroqProvider(Provider):
             return 0.0
 
         costs = self.COSTS[self.model]
-        input_cost = self._calculate_token_cost(usage.get("prompt_tokens", 0), costs["input"])
-        output_cost = self._calculate_token_cost(usage.get("completion_tokens", 0), costs["output"])
+        prompt_tokens = usage.get("prompt_tokens", 0)
+        completion_tokens = usage.get("completion_tokens", 0)
+        input_cost = self._calculate_token_cost(prompt_tokens, costs["input"])
+        output_cost = self._calculate_token_cost(
+            completion_tokens, costs["output"]
+        )
         return input_cost + output_cost
 
     def _get_api_key(self) -> str:
@@ -88,14 +92,26 @@ class GroqProvider(Provider):
                 error_message = error_obj.get("message", "Unknown error")
 
                 # Check for tool use failures - show what the model generated
-                if "tool_use_failed" in error_message.lower() or error_obj.get("failed_generation"):
+                is_tool_failure = (
+                    "tool_use_failed" in error_message.lower() or
+                    error_obj.get("failed_generation")
+                )
+                if is_tool_failure:
                     failed_gen = error_obj.get("failed_generation", "Not provided")
+                    hint_msg = (
+                        "Some models (especially 8b) may wrap JSON in XML tags."
+                    )
+                    recommendation = (
+                        "Try 'llama-3.3-70b-versatile' "
+                        "for more reliable tool calling."
+                    )
                     raise RuntimeError(
                         f"Groq API error (400): tool_use_failed\n"
-                        f"Model '{self.model}' generated malformed tool call format.\n"
+                        f"Model '{self.model}' generated "
+                        f"malformed tool call format.\n"
                         f"Generated: {failed_gen}\n"
-                        f"Hint: Some models (especially 8b) may wrap JSON in XML tags.\n"
-                        f"      Try 'llama-3.3-70b-versatile' for more reliable tool calling."
+                        f"Hint: {hint_msg}\n"
+                        f"      {recommendation}"
                     )
 
             # Generic error fallback

@@ -35,7 +35,8 @@ class ToolExecutor:
         Execute a single tool call.
 
         Args:
-            tool_call: Tool call object with 'function' containing 'name' and 'arguments'
+            tool_call: Tool call object with 'function' containing
+                'name' and 'arguments'
 
         Returns:
             String result from tool execution (or error message)
@@ -66,7 +67,8 @@ class ToolExecutor:
             exec_desc = f"{name}('{args['command']}')"
         else:
             # Show first few args for other tools
-            arg_preview = ", ".join(f"{k}={repr(v)[:50]}" for k, v in list(args.items())[:2])
+            arg_items = list(args.items())[:2]
+            arg_preview = ", ".join(f"{k}={repr(v)[:50]}" for k, v in arg_items)
             exec_desc = f"{name}({arg_preview})"
 
         self.log.info("Executing tool", tool=exec_desc)
@@ -77,7 +79,10 @@ class ToolExecutor:
             result_str = str(result)
 
             elapsed_ms = (time.time() - start) * 1000
-            result_preview = result_str[:100] + "..." if len(result_str) > 100 else result_str
+            if len(result_str) > 100:
+                result_preview = result_str[:100] + "..."
+            else:
+                result_preview = result_str
 
             self.log.info("Tool execution succeeded",
                          tool=name,

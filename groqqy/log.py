@@ -64,7 +64,12 @@ LOG_DIR.mkdir(exist_ok=True, parents=True)
 
 def console_formatter(record):
     """Custom formatter that includes tool info."""
-    base = "<green>{time:HH:mm:ss}</green> | <level>{level: <8}</level> | <cyan>{extra[component]}</cyan> | <level>{message}</level>"
+    base = (
+        "<green>{time:HH:mm:ss}</green> | "
+        "<level>{level: <8}</level> | "
+        "<cyan>{extra[component]}</cyan> | "
+        "<level>{message}</level>"
+    )
 
     # Add tool info if present
     if "tool" in record["extra"]:
@@ -85,7 +90,8 @@ logger.add(
     level=LOG_LEVEL,
     format=console_formatter,
     colorize=True,
-    filter=lambda record: "component" in record["extra"],  # Only log if component is set
+    # Only log if component is set
+    filter=lambda record: "component" in record["extra"],
 )
 
 # ============================================================================

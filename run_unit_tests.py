@@ -27,7 +27,7 @@ def run_test(name, test_func):
 
 def main():
     print("=" * 60)
-    print("Groqqy v2.2.0 Unit Tests")
+    print("Groqqy v2.2.2 Unit Tests")
     print("=" * 60)
     print()
 
@@ -136,6 +136,72 @@ def main():
         assert "Error" in result or "not found" in result.lower()
 
     results.append(run_test("test_read_nonexistent_file", test_nonexistent))
+
+    print()
+
+    # Test Suite 4: tools=None (--no-tools) Support
+    print("Test Suite 4: tools=None (--no-tools) Support")
+    print("-" * 40)
+
+    from unittest.mock import Mock, patch
+    from groqqy import Groqqy, Agent
+    from groqqy.tool import ToolRegistry
+    from groqqy.providers.groq import GroqProvider
+
+    def test_groqqy_none_tools():
+        with patch.object(GroqProvider, '__init__', return_value=None):
+            bot = Groqqy(tools=None)
+            assert bot.tools is None, f"Expected None, got {bot.tools}"
+
+    results.append(run_test("test_groqqy_accepts_none_tools", test_groqqy_none_tools))
+
+    def test_groqqy_no_defaults_with_none():
+        with patch.object(GroqProvider, '__init__', return_value=None):
+            bot = Groqqy(tools=None)
+            assert not isinstance(bot.tools, ToolRegistry), \
+                "tools=None should not create a ToolRegistry"
+
+    results.append(run_test("test_groqqy_none_no_default_registry", test_groqqy_no_defaults_with_none))
+
+    def test_groqqy_creates_defaults():
+        with patch.object(GroqProvider, '__init__', return_value=None):
+            bot = Groqqy()
+            assert bot.tools is not None, "Default should create registry"
+            assert isinstance(bot.tools, ToolRegistry), \
+                "Default should create ToolRegistry"
+
+    results.append(run_test("test_groqqy_default_creates_registry", test_groqqy_creates_defaults))
+
+    def test_agent_accepts_none():
+        with patch.object(GroqProvider, '__init__', return_value=None):
+            provider = Mock(spec=GroqProvider)
+            log = Mock()
+
+            agent = Agent(
+                provider=provider,
+                tools=None,
+                logger=log
+            )
+            assert agent.tools is None, f"Expected None, got {agent.tools}"
+
+    results.append(run_test("test_agent_accepts_none_tools", test_agent_accepts_none))
+
+    def test_agent_strategy_fallback():
+        from groqqy.strategy import LocalToolStrategy
+
+        with patch.object(GroqProvider, '__init__', return_value=None):
+            provider = Mock(spec=GroqProvider)
+            log = Mock()
+
+            agent = Agent(
+                provider=provider,
+                tools=None,
+                logger=log
+            )
+            assert isinstance(agent.strategy, LocalToolStrategy), \
+                f"Expected LocalToolStrategy, got {type(agent.strategy)}"
+
+    results.append(run_test("test_agent_strategy_with_none_tools", test_agent_strategy_fallback))
 
     print()
     print("=" * 60)

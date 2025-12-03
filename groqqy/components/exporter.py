@@ -67,11 +67,14 @@ class ConversationExporter:
                         # Pretty print arguments
                         args = func.get("arguments", "{}")
                         try:
-                            args_dict = json.loads(args) if isinstance(args, str) else args
+                            if isinstance(args, str):
+                                args_dict = json.loads(args)
+                            else:
+                                args_dict = args
                             lines.append("  ```json")
                             lines.append(f"  {json.dumps(args_dict, indent=2)}")
                             lines.append("  ```")
-                        except:
+                        except (json.JSONDecodeError, TypeError, AttributeError):
                             lines.append(f"  ```\n  {args}\n  ```")
                     lines.append("")
 
@@ -82,7 +85,8 @@ class ConversationExporter:
 
             elif role == "tool":
                 lines.append(f"## Message {i}: Tool Result\n")
-                lines.append(f"**Tool Call ID**: `{msg.get('tool_call_id', 'unknown')}`\n")
+                tool_call_id = msg.get('tool_call_id', 'unknown')
+                lines.append(f"**Tool Call ID**: `{tool_call_id}`\n")
                 lines.append("**Result:**\n")
                 lines.append("```")
                 lines.append(msg.get("content", ""))
@@ -93,7 +97,8 @@ class ConversationExporter:
                 lines.append(f"{msg.get('content', '')}\n")
 
         lines.append("\n---\n")
-        lines.append(f"*Exported by Groqqy on {self.timestamp.strftime('%Y-%m-%d %H:%M:%S')}*\n")
+        timestamp_str = self.timestamp.strftime('%Y-%m-%d %H:%M:%S')
+        lines.append(f"*Exported by Groqqy on {timestamp_str}*\n")
 
         return "\n".join(lines)
 
@@ -114,7 +119,11 @@ class ConversationExporter:
         html_parts.append("<html lang='en'>")
         html_parts.append("<head>")
         html_parts.append("  <meta charset='UTF-8'>")
-        html_parts.append("  <meta name='viewport' content='width=device-width, initial-scale=1.0'>")
+        viewport = (
+            "  <meta name='viewport' "
+            "content='width=device-width, initial-scale=1.0'>"
+        )
+        html_parts.append(viewport)
         html_parts.append("  <title>Groqqy Conversation</title>")
 
         if include_css:
@@ -128,7 +137,8 @@ class ConversationExporter:
         html_parts.append("    <header>")
         html_parts.append("      <h1>🤖 Groqqy Conversation</h1>")
         html_parts.append(f"      <div class='meta'>")
-        html_parts.append(f"        <span>📅 {self.timestamp.strftime('%Y-%m-%d %H:%M:%S')}</span>")
+        timestamp_str = self.timestamp.strftime('%Y-%m-%d %H:%M:%S')
+        html_parts.append(f"        <span>📅 {timestamp_str}</span>")
         html_parts.append(f"        <span>💬 {len(self.history)} messages</span>")
         html_parts.append(f"      </div>")
         html_parts.append("    </header>")
@@ -143,34 +153,52 @@ class ConversationExporter:
                 html_parts.append(f"      <div class='message user'>")
                 html_parts.append(f"        <div class='message-header'>👤 User</div>")
                 html_parts.append(f"        <div class='message-content'>")
-                html_parts.append(f"          {self._escape_html(msg.get('content', ''))}")
+                user_content = self._escape_html(msg.get('content', ''))
+                html_parts.append(f"          {user_content}")
                 html_parts.append(f"        </div>")
                 html_parts.append(f"      </div>")
 
             elif role == "assistant":
                 html_parts.append(f"      <div class='message assistant'>")
-                html_parts.append(f"        <div class='message-header'>🤖 Assistant</div>")
+                header = "        <div class='message-header'>🤖 Assistant</div>"
+                html_parts.append(header)
 
                 # Tool calls
                 tool_calls = msg.get("tool_calls", [])
                 if tool_calls:
                     html_parts.append(f"        <div class='tool-calls'>")
-                    html_parts.append(f"          <div class='tool-calls-header'>🔧 Tool Calls:</div>")
+                    tool_header = (
+                        "          <div class='tool-calls-header'>"
+                        "🔧 Tool Calls:</div>"
+                    )
+                    html_parts.append(tool_header)
                     for tc in tool_calls:
                         func = tc.get("function", {})
                         func_name = func.get("name", "unknown")
                         html_parts.append(f"          <div class='tool-call'>")
-                        html_parts.append(f"            <div class='tool-name'>{func_name}</div>")
+                        tool_name_div = (
+                            f"            <div class='tool-name'>"
+                            f"{func_name}</div>"
+                        )
+                        html_parts.append(tool_name_div)
 
                         # Arguments
                         args = func.get("arguments", "{}")
                         try:
-                            args_dict = json.loads(args) if isinstance(args, str) else args
+                            if isinstance(args, str):
+                                args_dict = json.loads(args)
+                            else:
+                                args_dict = args
                             args_json = json.dumps(args_dict, indent=2)
-                        except:
+                        except (json.JSONDecodeError, TypeError, AttributeError):
                             args_json = str(args)
 
-                        html_parts.append(f"            <pre class='tool-args'>{self._escape_html(args_json)}</pre>")
+                        escaped_args = self._escape_html(args_json)
+                        args_pre = (
+                            f"            <pre class='tool-args'>"
+                            f"{escaped_args}</pre>"
+                        )
+                        html_parts.append(args_pre)
                         html_parts.append(f"          </div>")
                     html_parts.append(f"        </div>")
 
@@ -185,22 +213,38 @@ class ConversationExporter:
 
             elif role == "tool":
                 html_parts.append(f"      <div class='message tool'>")
-                html_parts.append(f"        <div class='message-header'>⚙️ Tool Result</div>")
-                html_parts.append(f"        <div class='tool-id'>ID: {msg.get('tool_call_id', 'unknown')}</div>")
-                html_parts.append(f"        <pre class='tool-result'>{self._escape_html(msg.get('content', ''))}</pre>")
+                tool_header = "        <div class='message-header'>⚙️ Tool Result</div>"
+                html_parts.append(tool_header)
+                tool_id = msg.get('tool_call_id', 'unknown')
+                html_parts.append(f"        <div class='tool-id'>ID: {tool_id}</div>")
+                tool_content = self._escape_html(msg.get('content', ''))
+                result_pre = (
+                    f"        <pre class='tool-result'>{tool_content}</pre>"
+                )
+                html_parts.append(result_pre)
                 html_parts.append(f"      </div>")
 
             else:
                 html_parts.append(f"      <div class='message other'>")
-                html_parts.append(f"        <div class='message-header'>{role.title()}</div>")
-                html_parts.append(f"        <div class='message-content'>{self._escape_html(msg.get('content', ''))}</div>")
+                role_header = (
+                    f"        <div class='message-header'>"
+                    f"{role.title()}</div>"
+                )
+                html_parts.append(role_header)
+                other_content = self._escape_html(msg.get('content', ''))
+                msg_content_div = (
+                    f"        <div class='message-content'>"
+                    f"{other_content}</div>"
+                )
+                html_parts.append(msg_content_div)
                 html_parts.append(f"      </div>")
 
         html_parts.append("    </div>")
 
         # Footer
         html_parts.append("    <footer>")
-        html_parts.append(f"      <p>Exported by Groqqy on {self.timestamp.strftime('%Y-%m-%d %H:%M:%S')}</p>")
+        footer_time = self.timestamp.strftime('%Y-%m-%d %H:%M:%S')
+        html_parts.append(f"      <p>Exported by Groqqy on {footer_time}</p>")
         html_parts.append("    </footer>")
         html_parts.append("  </div>")
 
@@ -219,7 +263,8 @@ class ConversationExporter:
     }
 
     body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto,
+                   'Helvetica Neue', Arial, sans-serif;
       background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
       padding: 20px;
       line-height: 1.6;

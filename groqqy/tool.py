@@ -73,7 +73,8 @@ class ToolRegistry:
     def __init__(self):
         """Initialize empty registry."""
         self._tools: Dict[str, Tool] = {}
-        self._platform_tools: List[Dict[str, Any]] = []  # Platform tools (e.g., browser_search)
+        # Platform tools (e.g., browser_search)
+        self._platform_tools: List[Dict[str, Any]] = []
 
     def register(self, tool: Tool):
         """
