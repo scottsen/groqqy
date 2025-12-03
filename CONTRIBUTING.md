@@ -21,7 +21,6 @@ Be respectful, inclusive, and constructive. We're here to build great software t
 
 - Python 3.8+
 - Access to Groq API (get free key at https://console.groq.com)
-- TIA system (for GroqProvider) or willing to adapt to standalone
 
 ### Setup
 

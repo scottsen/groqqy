@@ -575,8 +575,8 @@ def _call_llm(self) -> Response:
 
 - **Architecture**: See `ARCHITECTURE.md` for design details
 - **Examples**: See `examples/` for usage patterns
-- **TIA Guide**: See `../../tia/docs/guides/TIA_PYTHON_DEVELOPMENT_GUIDE.md`
-- **Groq Docs**: See `../../tia/docs/guides/GROQ_AGENTIC_POWERHOUSE_GUIDE.md`
+- **Groq API Docs**: https://console.groq.com/docs
+- **Tool Calling Guide**: https://console.groq.com/docs/tool-use
 
 ---
 
