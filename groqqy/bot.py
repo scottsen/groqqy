@@ -40,7 +40,8 @@ class Groqqy:
         system_instruction: Optional[str] = None,
         max_iterations: int = 10,
         temperature: float = 0.5,
-        top_p: float = 0.65
+        top_p: float = 0.65,
+        lenient_tool_parsing: bool = True
     ):
         """
         Initialize Groqqy.
@@ -52,6 +53,7 @@ class Groqqy:
             max_iterations: Maximum agent loop iterations
             temperature: Sampling temperature (0.0-2.0, default 0.5 for tool calling)
             top_p: Nucleus sampling parameter (0.0-1.0, default 0.65 for tool calling)
+            lenient_tool_parsing: Enable automatic recovery from malformed tool calls (default True)
         """
         # Session tracking
         self.session_id = str(uuid.uuid4())[:8]
@@ -65,7 +67,8 @@ class Groqqy:
             model=model,
             system_instruction=system_instruction or self._default_instruction(),
             temperature=temperature,
-            top_p=top_p
+            top_p=top_p,
+            lenient_tool_parsing=lenient_tool_parsing
         )
 
         # Tool registry (distinguish None from omitted for backwards compat)
@@ -157,6 +160,11 @@ class Groqqy:
     def conversation(self) -> List[Dict[str, Any]]:
         """Get conversation history."""
         return self.agent.conversation.get_history()
+
+    @property
+    def lenient_parse_count(self) -> int:
+        """Get number of successful lenient tool call recoveries."""
+        return self.provider.lenient_parse_count
 
     # ========================================================================
     # Helpers

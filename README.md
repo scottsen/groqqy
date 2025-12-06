@@ -113,23 +113,63 @@ When using Groqqy for agentic workflows with tool calling, **model selection mat
 | **llama-4-scout** | ✅ Excellent | Fast | $0.0004/query | Optimized for tool use |
 | **llama-3.1-8b-instant** | ⚠️ Inconsistent | Fastest | $0.0003/query | Testing only |
 
-### Known Issue: `tool_use_failed` Errors
+### Automatic Tool Call Recovery 🛡️
 
-**Symptom**: `RuntimeError: Groq API error (400): tool_use_failed`
+**New in v2.4.0**: Groqqy now automatically recovers from malformed tool calls!
 
-**Cause**: Some models (especially 8b) occasionally generate tool calls wrapped in XML tags (`<function=name>{...}</function>`) instead of pure JSON. Groq's API rejects this format.
+Some LLMs occasionally wrap tool calls in XML tags like `<function=name>{...}</function>` instead of generating pure JSON. Groq's API rejects this format with `tool_use_failed` errors.
 
-**Solution**: Use `llama-3.3-70b-versatile` for production tool calling:
+**Groqqy now handles this automatically** with lenient tool call parsing:
 
 ```python
 from groqqy import Groqqy
 
-# Recommended for production
+# Lenient parsing enabled by default (recommended)
 bot = Groqqy(model="llama-3.3-70b-versatile")
 
-# Cheaper but less reliable
-bot = Groqqy(model="llama-3.1-8b-instant")  # May fail on tool calls
+# Disable if you want strict validation
+bot = Groqqy(model="llama-3.3-70b-versatile", lenient_tool_parsing=False)
+
+# Track recovery stats
+response, cost = bot.chat("Analyze the codebase")
+print(f"Recoveries: {bot.lenient_parse_count}")
 ```
+
+**How it works:**
+1. Model generates malformed output (e.g., XML-wrapped JSON)
+2. Groq API returns `tool_use_failed` error with `failed_generation` field
+3. Groqqy parses the malformed output and extracts valid tool calls
+4. Execution continues seamlessly
+
+**Benefits:**
+- ✅ Higher reliability across all models
+- ✅ Transparent to your code (just works)
+- ✅ Tracks recovery stats for monitoring
+- ✅ Falls back to error if recovery impossible
+
+### Prompt Best Practices for Tool Calling
+
+**The way you prompt matters!** Models are sensitive to how you ask them to use tools.
+
+❌ **Avoid explicit tool commands:**
+```python
+# DON'T: Explicit commands trigger XML wrapping
+bot.chat("Use the read_file tool on config.json")
+bot.chat("Call the search_files function with pattern *.py")
+```
+
+✅ **Use natural language instead:**
+```python
+# DO: Natural language works better
+bot.chat("What's in the config.json file?")
+bot.chat("Find all Python files in this directory")
+```
+
+**Why this matters:**
+- When you explicitly tell the model to "use" or "call" a tool, it tries to *demonstrate* the syntax
+- This triggers XML wrapping: `<function=read_file>{...}</function>`
+- Natural language lets the model choose tools autonomously → correct JSON format
+- Even with lenient parsing, natural prompts are more reliable
 
 **Cost trade-off**: 70b model costs ~3x more ($0.001 vs $0.0003 per query) but provides consistent tool calling. **Still 100x cheaper than Claude.**
 

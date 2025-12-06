@@ -1,6 +1,8 @@
 """Groq Provider - LLM API integration"""
 
 import os
+import re
+import json
 import requests
 from typing import List, Dict, Any, Optional
 
@@ -21,12 +23,15 @@ class GroqProvider(Provider):
     def __init__(self, model: str = "llama-3.1-8b-instant",
                  system_instruction: str = None,
                  temperature: float = 0.5,
-                 top_p: float = 0.65):
+                 top_p: float = 0.65,
+                 lenient_tool_parsing: bool = True):
         self.model = model
         self.api_key = self._get_api_key()
         self.system_message = self._create_system_message(system_instruction)
         self.temperature = temperature
         self.top_p = top_p
+        self.lenient_tool_parsing = lenient_tool_parsing
+        self.lenient_parse_count = 0  # Track recovery successes
 
     def chat(self, messages: List[Dict], tools: List = None) -> LLMResponse:
         payload = self._build_payload(messages, tools)
@@ -76,6 +81,86 @@ class GroqProvider(Provider):
             return [self.system_message] + messages
         return messages
 
+    def _attempt_lenient_tool_parse(self, failed_generation: str, tools: List[Dict]) -> Optional[List[Dict]]:
+        """
+        Attempt to extract tool calls from malformed model output.
+
+        Handles common malformations:
+        - XML wrappers: <function=name>{...}</function>
+        - Missing '>' after name: <function=name{...}></function>
+        - Multiple tool calls in one output
+
+        Args:
+            failed_generation: Raw model output that failed Groq validation
+            tools: List of available tools (for validation)
+
+        Returns:
+            List of tool_call dicts in OpenAI format if successful, None otherwise
+        """
+        if not failed_generation or not tools:
+            return None
+
+        # Build set of valid tool names for validation
+        valid_names = {t['function']['name'] for t in tools}
+
+        tool_calls = []
+
+        # Simple string splitting - no regex!
+        # Find all <function=...> patterns by splitting on '<function='
+        parts = failed_generation.split('<function=')
+
+        for i, part in enumerate(parts[1:], 1):  # Skip first part (before any function tags)
+            try:
+                # Find the closing tag
+                end_idx = part.find('</function>')
+                if end_idx == -1:
+                    continue
+
+                content = part[:end_idx]
+
+                # Extract function name and JSON
+                # The model generates various malformed formats:
+                # - Correct: "name>{json}"
+                # - Wrong: "name{json}" (missing '>' after name)
+                # - Wrong: "name{json}>" ('>' after json instead of after name)
+
+                # Find where JSON starts (always starts with '{')
+                brace_idx = content.find('{')
+                if brace_idx == -1:
+                    continue
+
+                # Everything before '{' is the function name (possibly with '>')
+                func_name = content[:brace_idx].strip().rstrip('>')
+
+                # Everything from '{' onwards is JSON (possibly with trailing '>')
+                json_str = content[brace_idx:].strip().rstrip('>')
+
+                # Validate function name
+                if func_name not in valid_names:
+                    continue
+
+                # Validate JSON - let json.loads do the heavy lifting
+                try:
+                    json.loads(json_str)  # Validate it's valid JSON
+                except json.JSONDecodeError:
+                    continue
+
+                # Build OpenAI-format tool call
+                tool_calls.append({
+                    "id": f"call_lenient_{i}_{hash(json_str) & 0xFFFFFF:06x}",
+                    "type": "function",
+                    "function": {
+                        "name": func_name,
+                        "arguments": json_str  # Keep as string per OpenAI spec
+                    }
+                })
+
+            except Exception:
+                # Skip this part if anything goes wrong
+                continue
+
+        return tool_calls if tool_calls else None
+
     def _call_api(self, payload: Dict) -> Dict:
         response = requests.post(
             self.API_URL,
@@ -91,27 +176,67 @@ class GroqProvider(Provider):
                 error_obj = error_data.get("error", {})
                 error_message = error_obj.get("message", "Unknown error")
 
-                # Check for tool use failures - show what the model generated
+                # Check for tool use failures
                 is_tool_failure = (
                     "tool_use_failed" in error_message.lower() or
                     error_obj.get("failed_generation")
                 )
+
+                if is_tool_failure and self.lenient_tool_parsing:
+                    failed_gen = error_obj.get("failed_generation", "")
+                    tools = payload.get("tools", [])
+
+                    # Attempt lenient parsing
+                    if failed_gen and tools:
+                        recovered_calls = self._attempt_lenient_tool_parse(failed_gen, tools)
+
+                        if recovered_calls:
+                            # SUCCESS: Recovery worked!
+                            self.lenient_parse_count += 1
+
+                            # Return synthetic successful response in OpenAI format
+                            return {
+                                "choices": [{
+                                    "index": 0,
+                                    "message": {
+                                        "role": "assistant",
+                                        "content": None,
+                                        "tool_calls": recovered_calls
+                                    },
+                                    "finish_reason": "tool_calls"
+                                }],
+                                "usage": {
+                                    "prompt_tokens": 0,  # Unknown - Groq didn't return usage
+                                    "completion_tokens": 0,
+                                    "total_tokens": 0
+                                },
+                                "model": self.model,
+                                "_lenient_parse": True,  # Flag for tracking/debugging
+                                "_original_error": failed_gen  # Keep for debugging
+                            }
+
+                # Lenient parsing disabled or failed - raise error
                 if is_tool_failure:
                     failed_gen = error_obj.get("failed_generation", "Not provided")
+
+                    # Build helpful error message
                     hint_msg = (
-                        "Some models (especially 8b) may wrap JSON in XML tags."
+                        "Some models (especially 8b) may wrap JSON in XML tags.\n"
+                        "      Use natural language prompts instead of explicit commands:\n"
+                        "      ✅ 'I need to understand the code structure'\n"
+                        "      ❌ 'Use the reveal_structure tool on /path'"
                     )
-                    recommendation = (
-                        "Try 'llama-3.3-70b-versatile' "
-                        "for more reliable tool calling."
-                    )
+
+                    if self.lenient_tool_parsing:
+                        hint_msg += "\n      Lenient parsing attempted but failed."
+                    else:
+                        hint_msg += "\n      Lenient parsing is disabled. Enable with lenient_tool_parsing=True"
+
                     raise RuntimeError(
                         f"Groq API error (400): tool_use_failed\n"
-                        f"Model '{self.model}' generated "
-                        f"malformed tool call format.\n"
+                        f"Model '{self.model}' generated malformed tool call format.\n"
                         f"Generated: {failed_gen}\n"
-                        f"Hint: {hint_msg}\n"
-                        f"      {recommendation}"
+                        f"Hint: {hint_msg}"
                     )
 
             # Generic error fallback

@@ -51,6 +51,11 @@ Documentation = "https://github.com/scottsen/groqqy/tree/master/docs"
 Repository = "https://github.com/scottsen/groqqy"
 Issues = "https://github.com/scottsen/groqqy/issues"
 
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["groqqy*"]
+exclude = ["tests*", "docs*", "examples*", "logs*"]
+
 [tool.black]
 line-length = 100
 target-version = ['py38', 'py39', 'py310', 'py311']
