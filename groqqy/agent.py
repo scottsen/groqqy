@@ -80,6 +80,9 @@ class Agent:
         self.executor = ToolExecutor(tools, logger) if tools is not None else None
         self.tracker = CostTracker()
 
+        # Loop detection (prevent infinite repeated tool calls)
+        self.tool_call_history = []
+
     def run(self, prompt: str) -> AgentResult:
         """
         Run the agent loop until task is complete.
@@ -150,6 +153,26 @@ class Agent:
                              iteration=iteration,
                              tools=tool_summaries)
 
+                # Check for infinite loops (repeated identical tool calls)
+                if self._detect_loop(execution_result.tool_calls):
+                    self.log.warning("Loop detected - agent repeating identical tool calls",
+                                   iteration=iteration,
+                                   tools=tool_summaries)
+
+                    # Add warning to conversation
+                    self.conversation.add_assistant(
+                        "[Loop detected: Agent is repeating the same tool calls. "
+                        "Task may not be possible with available tools. Stopping.]"
+                    )
+
+                    return AgentResult(
+                        response="[Loop detected - agent stuck in repeated tool calls]",
+                        iterations=iteration,
+                        total_cost=self.tracker.get_total(),
+                        tool_calls_made=tool_calls_made,
+                        conversation=self.conversation.get_history()
+                    )
+
                 # Add tool calls to conversation
                 self.conversation.add_tool_calls(
                     response.text, execution_result.tool_calls
@@ -219,8 +242,50 @@ class Agent:
             tools=tools_schemas
         )
 
+    def _detect_loop(self, tool_calls: List[Dict]) -> bool:
+        """
+        Detect if agent is stuck in a loop (repeated identical tool calls).
+
+        Checks if the last 3 tool call sets are identical, indicating the agent
+        is repeating the same failed actions without making progress.
+
+        Args:
+            tool_calls: Current set of tool calls to check
+
+        Returns:
+            True if loop detected, False otherwise
+        """
+        import json
+
+        # Build signature for this set of tool calls
+        signature = []
+        for tc in tool_calls:
+            name = tc['function']['name']
+            args = tc['function']['arguments']
+            # Normalize args to string for comparison
+            args_str = args if isinstance(args, str) else json.dumps(args, sort_keys=True)
+            signature.append(f"{name}({args_str})")
+
+        # Sort for consistent comparison (order doesn't matter for loop detection)
+        signature_str = "||".join(sorted(signature))
+
+        # Check last 3 iterations for identical calls
+        if len(self.tool_call_history) >= 2:
+            recent = self.tool_call_history[-2:]  # Last 2 signatures
+            if all(s == signature_str for s in recent):
+                # Same call 3 times in a row (2 previous + this one) = loop
+                return True
+
+        # Add to history (keep last 5 for efficiency)
+        self.tool_call_history.append(signature_str)
+        if len(self.tool_call_history) > 5:
+            self.tool_call_history.pop(0)
+
+        return False
+
     def reset(self):
         """Reset agent state (conversation, costs)."""
         self.conversation.reset()
         self.tracker.reset()
+        self.tool_call_history = []  # Reset loop detection
         self.log.debug("Agent reset")

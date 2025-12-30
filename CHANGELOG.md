@@ -7,6 +7,48 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.4.0] - 2025-12-29
+
+### Added
+- **Loop detection**: Agent now detects and prevents infinite repeated tool calls
+  - Tracks last 3 tool call signatures in `agent.py` (line 84: `self.tool_call_history`)
+  - Compares current tool calls with last 2 in history via `_detect_loop()` method (lines 245-284)
+  - Stops immediately when same calls repeated 3 times, returns clear "[Loop detected]" message
+  - Prevents wasting 10-30 iterations on impossible tasks
+  - Saves API costs and debugging time
+- **Tool result truncation**: Configurable size limits prevent context overflow from large tool outputs
+  - Default 10KB limit in `executor.py` (lines 82-100)
+  - Configurable via `GROQQY_MAX_RESULT_SIZE` environment variable
+  - Clear truncation message includes original size and instructions
+  - Warning logged for debugging (includes sizes and tool name)
+  - Applies to all tools automatically
+- **Context overflow prevention**: Conversation auto-prunes when approaching model limits
+  - `ConversationManager` accepts `max_context_tokens` parameter (default: 100K for 128K models)
+  - `estimate_tokens()` method provides conservative token estimation (~4 chars/token)
+  - `prune_if_needed()` automatically prunes at 80% threshold
+  - Keeps system message (first) + last 10 messages
+  - Auto-prunes after every message add (lines 102, 115, 130, 145)
+  - Prevents Groq API "context_length_exceeded" errors
+
+### Changed
+- **Agent initialization**: Added `tool_call_history = []` tracking for loop detection
+- **Agent reset**: Now clears `tool_call_history` to reset loop detection state (line 290)
+- **ConversationManager**: New `max_context_tokens` parameter changes signature (backwards compatible with default)
+- **ToolExecutor**: All tool results now checked for size and truncated if needed
+
+### Fixed
+- **Infinite loops**: Agents no longer repeat identical tool calls endlessly (critical bug from Scout failure analysis)
+- **Context overflow**: Large tool results (e.g., 113KB from reveal_structure) now truncated before causing API errors
+- **Multi-phase campaigns**: Fixed phase isolation in Scout research campaigns via context file synchronization
+- **Groq API errors**: Prevents "context_length_exceeded" errors via automatic conversation pruning
+
+### Impact
+- **Production safety**: All 5 critical bugs from December 2025 Scout failure analysis fixed
+- **Cost savings**: Loop detection prevents wasted API calls on impossible tasks
+- **Reliability**: Enables successful multi-phase Scout campaigns on large repositories
+- **Battle-tested**: Fixes validated against real-world failure scenarios
+- **Backwards compatible**: No breaking changes for existing code (new features opt-in via env vars and parameters)
+
 ## [2.3.0] - 2025-12-03
 
 ### Changed

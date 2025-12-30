@@ -5,6 +5,7 @@ Single responsibility: Tool execution with error handling
 """
 
 import json
+import os
 import time
 from typing import Dict, List, Tuple, Any, Optional
 
@@ -63,13 +64,16 @@ class ToolExecutor:
         start = time.time()
 
         # Create human-readable description of what's being executed
-        if name == "run_command" and "command" in args:
+        if args and name == "run_command" and "command" in args:
             exec_desc = f"{name}('{args['command']}')"
-        else:
+        elif args:
             # Show first few args for other tools
             arg_items = list(args.items())[:2]
             arg_preview = ", ".join(f"{k}={repr(v)[:50]}" for k, v in arg_items)
             exec_desc = f"{name}({arg_preview})"
+        else:
+            # No args
+            exec_desc = f"{name}()"
 
         self.log.info("Executing tool", tool=exec_desc)
         self.log.debug("Tool execution started", tool=name, args=args)
@@ -77,6 +81,26 @@ class ToolExecutor:
         try:
             result = tool.execute(**args)
             result_str = str(result)
+
+            # Truncate large results to prevent context overflow
+            # Configurable via env var (default: 10KB)
+            MAX_RESULT_SIZE = int(os.getenv('GROQQY_MAX_RESULT_SIZE', '10000'))
+
+            if len(result_str) > MAX_RESULT_SIZE:
+                original_size = len(result_str)
+                result_str = result_str[:MAX_RESULT_SIZE]
+                truncated_msg = (
+                    f"\n\n[... Result truncated: {original_size} chars total, "
+                    f"showing first {MAX_RESULT_SIZE} chars. "
+                    f"Set GROQQY_MAX_RESULT_SIZE env var to increase limit ...]"
+                )
+                result_str += truncated_msg
+
+                self.log.warning("Tool result truncated to prevent context overflow",
+                               tool=name,
+                               original_size=original_size,
+                               truncated_size=MAX_RESULT_SIZE,
+                               final_size=len(result_str))
 
             elapsed_ms = (time.time() - start) * 1000
             if len(result_str) > 100:

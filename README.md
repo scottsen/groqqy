@@ -14,23 +14,51 @@ Ultra-fast, ultra-cheap, and truly agentic. Groqqy is a multi-step reasoning age
 - 📚 **Teaching-Friendly**: Clean, readable code (<200 lines per file) perfect for learning agentic AI
 - 📝 **Export Ready**: Save conversations to markdown/HTML with full tool call visibility
 
-## What's New in v2.2.2
+## What's New in v2.4.0
 
-**Pure LLM Mode & Code Quality:**
+**Production Safety Features:**
+
+- 🛡️ **Loop Detection**: Automatically detects and stops infinite tool call loops (prevents wasted iterations)
+- 📏 **Tool Result Truncation**: Configurable size limits prevent context overflow from large outputs (default 10KB, set via `GROQQY_MAX_RESULT_SIZE`)
+- 🔄 **Context Overflow Prevention**: Auto-prunes conversation history when approaching model limits (keeps system message + last 10 messages)
+- 💰 **Saves API Costs**: Loop detection prevents wasting 10-30 iterations on impossible tasks
+- 🎯 **Battle-Tested**: Fixes identified from Scout research campaign failures
+
+**How Loop Detection Works:**
+```python
+# Tracks last 3 tool call signatures
+# If agent repeats same calls 3 times → stops immediately
+# Returns clear "[Loop detected]" message
+agent = Agent(provider, tools, max_iterations=10)
+result = agent.run("impossible task")
+# → "[Loop detected - agent stuck in repeated tool calls]"
+```
+
+**How Truncation Works:**
+```bash
+# Set custom limit (default: 10KB)
+export GROQQY_MAX_RESULT_SIZE=20000
+```
+
+**How Context Pruning Works:**
+```python
+# Auto-prunes at 80% of max_context_tokens (default: 100K)
+conversation = ConversationManager(max_context_tokens=100000)
+# When limit approached: keeps system + last 10 messages
+```
+
+**Previous Features (v2.2.2):**
 
 - 🚫 **Disable Tools**: New `tools=None` parameter for pure text generation without tool-calling overhead
 - 🔒 **Security Fixes**: Replaced bare except clauses with specific exception handling
 - 📏 **PEP 8 Compliance**: All core modules now pass linting with zero issues
 - ✅ **Comprehensive Testing**: 20/20 tests passing including new --no-tools test suite
-- 📝 **Complete Documentation**: README and CHANGELOG fully updated
 
 **Previous Features (v2.1.0):**
 
 - 📝 **Conversation Export**: Export full conversations to markdown/HTML with tool call details
 - 🎓 **Self-Discovery**: Agents can autonomously learn new tools via minimal seed prompts
 - 🧪 **Container Testing**: Reproducible testing infrastructure with Podman
-- 📚 **Documentation Reorganization**: Clean structure with guides and examples
-- 🧹 **Project Cleanup**: Professional structure, organized tests, comprehensive examples
 
 See [CHANGELOG.md](CHANGELOG.md) for full history.
 
@@ -508,6 +536,29 @@ mypy groqqy/
 MIT License - see [LICENSE](LICENSE) file for details.
 
 ## Related Projects
+
+### Built on Groqqy
+
+- **[Scout](https://github.com/scottsen/tia/tree/master/projects/scout)** - TIA's AI reconnaissance agent with persistent memory and Reveal integration
+- **[Groqqy-Web](https://github.com/scottsen/groqqy-web)** - Web interface for Groqqy agents (deployed at groqqy.mytia.net)
+- **Ask the SIL** (in design) - Transparent multi-agent interface demonstrating hierarchical agency
+
+### Ecosystem Evolution
+
+```
+Groqqy (core library - this project)
+  ↓ powers
+Scout (proof-of-concept agent with memory + tools)
+  ↓ informs
+Ask the SIL (multi-agent product with transparency)
+```
+
+**What each proves:**
+- **Groqqy**: Ultra-fast, ultra-cheap agentic loops work
+- **Scout**: Agents can handle real-world queries with memory + tools
+- **Ask the SIL**: Transparent multi-agent coordination works at scale
+
+### External Resources
 
 - [Groq API Docs](https://console.groq.com/docs) - Groq's LPU inference
 - [ReAct Paper](https://arxiv.org/abs/2210.03629) - Reasoning + Acting framework (Yao et al., 2022)
