@@ -41,7 +41,8 @@ class Groqqy:
         max_iterations: int = 10,
         temperature: float = 0.5,
         top_p: float = 0.65,
-        lenient_tool_parsing: bool = True
+        lenient_tool_parsing: bool = True,
+        debug_dir: Optional[str] = None
     ):
         """
         Initialize Groqqy.
@@ -54,6 +55,7 @@ class Groqqy:
             temperature: Sampling temperature (0.0-2.0, default 0.5 for tool calling)
             top_p: Nucleus sampling parameter (0.0-1.0, default 0.65 for tool calling)
             lenient_tool_parsing: Enable automatic recovery from malformed tool calls (default True)
+            debug_dir: Directory for failure state dumps (defaults to ./logs/debug if not provided)
         """
         # Session tracking
         self.session_id = str(uuid.uuid4())[:8]
@@ -82,12 +84,18 @@ class Groqqy:
             # Custom ToolRegistry provided
             self.tools = tools
 
+        # Set default debug_dir if not provided
+        if debug_dir is None:
+            import os
+            debug_dir = os.path.join("logs", "debug")
+
         # Agent (does the heavy lifting)
         self.agent = Agent(
             provider=self.provider,
             tools=self.tools,
             max_iterations=max_iterations,
-            logger=self.log
+            logger=self.log,
+            debug_dir=debug_dir
         )
 
         tool_info = {}

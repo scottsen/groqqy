@@ -48,7 +48,8 @@ class Agent:
         tools: ToolRegistry,
         max_iterations: int = 10,
         logger=None,
-        strategy: Optional[ToolExecutionStrategy] = None
+        strategy: Optional[ToolExecutionStrategy] = None,
+        debug_dir: Optional[str] = None
     ):
         """
         Initialize agent.
@@ -59,11 +60,13 @@ class Agent:
             max_iterations: Maximum agent loop iterations (prevents infinite loops)
             logger: Optional logger
             strategy: Tool execution strategy (auto-detected if not provided)
+            debug_dir: Optional directory for saving failure state dumps
         """
         self.provider = provider
         self.tools = tools
         self.max_iterations = max_iterations
         self.log = logger or get_logger("agent")
+        self.debug_dir = debug_dir
 
         # Auto-detect strategy based on tool types (or use default if no tools)
         if tools is not None:
@@ -117,6 +120,18 @@ class Agent:
             # THINK: What should I do next?
             response = self._call_llm()
 
+            # Log LLM response for debugging (helps understand agent reasoning)
+            has_tool_calls = hasattr(response, 'tool_calls') and response.tool_calls is not None
+            num_tool_calls = len(response.tool_calls) if has_tool_calls else 0
+            response_preview = response.text[:500] if response.text else ""
+
+            self.log.debug("LLM response received",
+                          iteration=iteration,
+                          response_length=len(response.text) if response.text else 0,
+                          response_preview=response_preview,
+                          has_tool_calls=has_tool_calls,
+                          num_tool_calls=num_tool_calls)
+
             # Track cost
             cost = self.provider.get_cost(response.usage)
             self.tracker.add(cost, {"iteration": iteration})
@@ -159,11 +174,23 @@ class Agent:
                                    iteration=iteration,
                                    tools=tool_summaries)
 
+                    # Dump full conversation state for debugging
+                    dump_path = self._dump_failure_state(
+                        failure_type="loop_detected",
+                        iteration=iteration,
+                        tool_calls=execution_result.tool_calls,
+                        response_text=response.text
+                    )
+
                     # Add warning to conversation
-                    self.conversation.add_assistant(
+                    warning_msg = (
                         "[Loop detected: Agent is repeating the same tool calls. "
                         "Task may not be possible with available tools. Stopping.]"
                     )
+                    if dump_path:
+                        warning_msg += f"\n[Debug state saved to: {dump_path}]"
+
+                    self.conversation.add_assistant(warning_msg)
 
                     return AgentResult(
                         response="[Loop detected - agent stuck in repeated tool calls]",
@@ -219,6 +246,13 @@ class Agent:
         # Max iterations reached - return partial result
         self.log.warning(f"Max iterations ({self.max_iterations}) reached",
                         tool_calls_made=tool_calls_made)
+
+        # Dump full conversation state for debugging
+        self._dump_failure_state(
+            failure_type="max_iterations",
+            iteration=iteration,
+            response_text=None  # No response available at this point
+        )
 
         return AgentResult(
             response="[Agent reached max iterations - task may be incomplete]",
@@ -282,6 +316,80 @@ class Agent:
             self.tool_call_history.pop(0)
 
         return False
+
+    def _dump_failure_state(self, failure_type: str, iteration: int,
+                            tool_calls: Optional[List[Dict]] = None,
+                            response_text: Optional[str] = None) -> Optional[str]:
+        """
+        Dump complete conversation state when a failure occurs.
+
+        This creates a JSON file with full context for debugging, including:
+        - Conversation history
+        - Tool call history (for loop detection)
+        - Last LLM response
+        - Last tool calls and results
+
+        Args:
+            failure_type: Type of failure ("loop_detected", "max_iterations", etc.)
+            iteration: Current iteration number
+            tool_calls: Tool calls that triggered the failure (if applicable)
+            response_text: Last LLM response text (if available)
+
+        Returns:
+            Path to dump file if created, None otherwise
+        """
+        if not self.debug_dir:
+            return None
+
+        try:
+            import json
+            from pathlib import Path
+            from datetime import datetime
+
+            debug_path = Path(self.debug_dir)
+            debug_path.mkdir(parents=True, exist_ok=True)
+
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            dump_file = debug_path / f"failure_{failure_type}_{timestamp}.json"
+
+            # Build tool call signatures for loop analysis
+            tool_signatures = []
+            if tool_calls:
+                for tc in tool_calls:
+                    name = tc['function']['name']
+                    args = tc['function']['arguments']
+                    args_str = args if isinstance(args, str) else json.dumps(args, sort_keys=True)
+                    tool_signatures.append(f"{name}({args_str})")
+
+            dump_data = {
+                "failure_type": failure_type,
+                "timestamp": timestamp,
+                "iteration": iteration,
+                "max_iterations": self.max_iterations,
+                "conversation_history": self.conversation.get_history(),
+                "tool_call_history": self.tool_call_history,
+                "current_tool_calls": tool_signatures,
+                "last_response_text": response_text,
+                "total_cost": self.tracker.get_total(),
+                "tool_calls_made": sum(1 for msg in self.conversation.get_history()
+                                      if msg.get('role') == 'assistant' and msg.get('tool_calls'))
+            }
+
+            with open(dump_file, 'w') as f:
+                json.dump(dump_data, f, indent=2)
+
+            self.log.info("Failure state dumped",
+                         failure_type=failure_type,
+                         dump_file=str(dump_file),
+                         conversation_messages=len(self.conversation.get_history()))
+
+            return str(dump_file)
+
+        except Exception as e:
+            self.log.error("Failed to dump failure state",
+                          error=str(e),
+                          error_type=type(e).__name__)
+            return None
 
     def reset(self):
         """Reset agent state (conversation, costs)."""
