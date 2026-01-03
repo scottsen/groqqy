@@ -470,6 +470,49 @@ class GroqProvider(Provider):
 - Each provider knows its pricing
 - Agent doesn't care about pricing details
 
+### Rate Limit Handling
+
+**Implementation:** `providers/groq.py` - `_call_api()` method
+
+**Purpose:** Automatically retry API calls when Groq rate limits are hit (HTTP 429)
+
+**Configuration:**
+```python
+provider = GroqProvider(
+    model="llama-3.1-8b-instant",
+    max_retries=3,              # Max retry attempts (default: 3)
+    initial_backoff=1.0,        # Initial wait time in seconds (default: 1.0)
+    backoff_multiplier=2.0,     # Exponential multiplier (default: 2.0)
+    max_backoff=60.0            # Max wait cap in seconds (default: 60.0)
+)
+```
+
+**Retry Strategy:**
+
+1. **Detect rate limit:** HTTP 429 status code
+2. **Extract wait time:** From `retry-after` header or error message ("Please try again in Xs")
+3. **Calculate backoff:** Use suggested time or exponential: `min(initial * multiplier^attempt, max)`
+4. **Wait and retry:** Sleep for calculated time, then retry
+5. **Max retries:** After 3 attempts (default), raise clear error
+
+**Example backoff sequence:**
+- Attempt 1: Wait 1.0s
+- Attempt 2: Wait 2.0s
+- Attempt 3: Wait 4.0s
+- Fail: Raise `RuntimeError` with retry count
+
+**Benefits:**
+- Transparent to Agent layer - retries happen automatically
+- Respects Groq's suggested wait times (from API response)
+- Configurable for different use cases (production vs testing)
+- Clear feedback with console output during retries
+- Tracks total retry count for monitoring (`provider.retry_count`)
+
+**Error handling:**
+- Rate limit (429): Retry with backoff
+- Tool use failure (400): Lenient parsing recovery (separate feature)
+- Other errors: Immediate failure (no retry)
+
 ---
 
 ## Design Patterns Used
