@@ -591,22 +591,33 @@ MIT License - see [LICENSE](LICENSE) file for details.
 
 - **[Scout](https://github.com/scottsen/tia/tree/master/projects/scout)** - TIA's AI reconnaissance agent with persistent memory and Reveal integration
 - **[Groqqy-Web](https://github.com/scottsen/groqqy-web)** - Web interface for Groqqy agents (deployed at groqqy.mytia.net)
-- **Ask the SIL** (in design) - Transparent multi-agent interface demonstrating hierarchical agency
+- **[Agent Ether](https://github.com/scottsen/agent-ether)** (in development) - Universal tool orchestration layer (Layer 6) with hierarchical multi-agent coordination
 
 ### Ecosystem Evolution
 
 ```
-Groqqy (core library - this project)
+Groqqy (Foundation)
   ↓ powers
-Scout (proof-of-concept agent with memory + tools)
+Scout (Proof-of-Concept)
   ↓ informs
-Ask the SIL (multi-agent product with transparency)
+Agent Ether (Production Layer)
 ```
 
 **What each proves:**
 - **Groqqy**: Ultra-fast, ultra-cheap agentic loops work
+  - Lightweight LLM orchestration library
+  - ReAct pattern, tool registry, cost tracking
+  - Foundation for TIA's agent ecosystem
+
 - **Scout**: Agents can handle real-world queries with memory + tools
-- **Ask the SIL**: Transparent multi-agent coordination works at scale
+  - AI code research platform with anti-hallucination
+  - Discovers failure modes and patterns at scale
+  - v4.0 anti-hallucination architecture is reusable across LLM workflows
+
+- **Agent Ether**: Transparent multi-agent coordination works at scale
+  - Universal tool behavior contracts (Layer 6 orchestration)
+  - Hierarchical agency with complete transparency
+  - Adopts Scout's battle-tested anti-hallucination patterns
 
 ### External Resources
 
