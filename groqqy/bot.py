@@ -42,7 +42,11 @@ class Groqqy:
         temperature: float = 0.5,
         top_p: float = 0.65,
         lenient_tool_parsing: bool = True,
-        debug_dir: Optional[str] = None
+        debug_dir: Optional[str] = None,
+        max_retries: int = 3,
+        initial_backoff: float = 1.0,
+        backoff_multiplier: float = 2.0,
+        max_backoff: float = 60.0
     ):
         """
         Initialize Groqqy.
@@ -56,6 +60,10 @@ class Groqqy:
             top_p: Nucleus sampling parameter (0.0-1.0, default 0.65 for tool calling)
             lenient_tool_parsing: Enable automatic recovery from malformed tool calls (default True)
             debug_dir: Directory for failure state dumps (defaults to ./logs/debug if not provided)
+            max_retries: Maximum retry attempts for rate limit errors (default 3)
+            initial_backoff: Initial backoff time in seconds for retries (default 1.0)
+            backoff_multiplier: Exponential backoff multiplier (default 2.0)
+            max_backoff: Maximum backoff time in seconds (default 60.0)
         """
         # Session tracking
         self.session_id = str(uuid.uuid4())[:8]
@@ -70,7 +78,11 @@ class Groqqy:
             system_instruction=system_instruction or self._default_instruction(),
             temperature=temperature,
             top_p=top_p,
-            lenient_tool_parsing=lenient_tool_parsing
+            lenient_tool_parsing=lenient_tool_parsing,
+            max_retries=max_retries,
+            initial_backoff=initial_backoff,
+            backoff_multiplier=backoff_multiplier,
+            max_backoff=max_backoff
         )
 
         # Tool registry (distinguish None from omitted for backwards compat)

@@ -3,6 +3,7 @@
 import os
 import re
 import json
+import time
 import requests
 from typing import List, Dict, Any, Optional
 
@@ -24,7 +25,11 @@ class GroqProvider(Provider):
                  system_instruction: str = None,
                  temperature: float = 0.5,
                  top_p: float = 0.65,
-                 lenient_tool_parsing: bool = True):
+                 lenient_tool_parsing: bool = True,
+                 max_retries: int = 3,
+                 initial_backoff: float = 1.0,
+                 backoff_multiplier: float = 2.0,
+                 max_backoff: float = 60.0):
         self.model = model
         self.api_key = self._get_api_key()
         self.system_message = self._create_system_message(system_instruction)
@@ -32,6 +37,12 @@ class GroqProvider(Provider):
         self.top_p = top_p
         self.lenient_tool_parsing = lenient_tool_parsing
         self.lenient_parse_count = 0  # Track recovery successes
+        # Rate limit retry configuration
+        self.max_retries = max_retries
+        self.initial_backoff = initial_backoff
+        self.backoff_multiplier = backoff_multiplier
+        self.max_backoff = max_backoff
+        self.retry_count = 0  # Track total retries across session
 
     def chat(self, messages: List[Dict], tools: List = None) -> LLMResponse:
         payload = self._build_payload(messages, tools)
@@ -161,88 +172,180 @@ class GroqProvider(Provider):
 
         return tool_calls if tool_calls else None
 
+    def _extract_retry_after(self, response: requests.Response, error_data: Dict) -> Optional[float]:
+        """
+        Extract retry-after time from response headers or error message.
+
+        Args:
+            response: HTTP response object
+            error_data: Error JSON data
+
+        Returns:
+            Seconds to wait before retry, or None if not found
+        """
+        # First try retry-after header
+        retry_after = response.headers.get('retry-after')
+        if retry_after:
+            try:
+                return float(retry_after)
+            except ValueError:
+                pass
+
+        # Then try parsing error message: "Please try again in 8.12s"
+        error_message = error_data.get('error', {}).get('message', '')
+        match = re.search(r'Please try again in ([0-9.]+)s', error_message)
+        if match:
+            try:
+                return float(match.group(1))
+            except ValueError:
+                pass
+
+        return None
+
+    def _calculate_backoff(self, attempt: int, suggested_wait: Optional[float] = None) -> float:
+        """
+        Calculate wait time with exponential backoff.
+
+        Args:
+            attempt: Current retry attempt (0-indexed)
+            suggested_wait: Suggested wait time from API (if available)
+
+        Returns:
+            Seconds to wait
+        """
+        if suggested_wait is not None:
+            # Use API suggestion, but cap at max_backoff
+            return min(suggested_wait, self.max_backoff)
+
+        # Exponential backoff: initial * (multiplier ^ attempt)
+        backoff = self.initial_backoff * (self.backoff_multiplier ** attempt)
+        return min(backoff, self.max_backoff)
+
     def _call_api(self, payload: Dict) -> Dict:
-        response = requests.post(
-            self.API_URL,
-            headers=self._build_headers(),
-            json=payload,
-        )
+        """
+        Call Groq API with automatic retry on rate limits.
 
-        if not response.ok:
-            error_data = response.json() if response.text else {}
+        Implements exponential backoff with configurable parameters.
+        Handles 429 rate limit errors by retrying after suggested wait time.
 
-            # Enhanced error handling for tool_use_failed (400 errors)
-            if response.status_code == 400:
-                error_obj = error_data.get("error", {})
-                error_message = error_obj.get("message", "Unknown error")
+        Args:
+            payload: API request payload
 
-                # Check for tool use failures
-                is_tool_failure = (
-                    "tool_use_failed" in error_message.lower() or
-                    error_obj.get("failed_generation")
-                )
+        Returns:
+            API response dictionary
 
-                if is_tool_failure and self.lenient_tool_parsing:
-                    failed_gen = error_obj.get("failed_generation", "")
-                    tools = payload.get("tools", [])
+        Raises:
+            RuntimeError: On non-retryable errors or after max retries exhausted
+        """
+        for attempt in range(self.max_retries):
+            response = requests.post(
+                self.API_URL,
+                headers=self._build_headers(),
+                json=payload,
+            )
 
-                    # Attempt lenient parsing
-                    if failed_gen and tools:
-                        recovered_calls = self._attempt_lenient_tool_parse(failed_gen, tools)
+            if not response.ok:
+                error_data = response.json() if response.text else {}
 
-                        if recovered_calls:
-                            # SUCCESS: Recovery worked!
-                            self.lenient_parse_count += 1
+                # Handle rate limit (429) errors with retry
+                if response.status_code == 429:
+                    # Extract wait time from response
+                    suggested_wait = self._extract_retry_after(response, error_data)
+                    wait_time = self._calculate_backoff(attempt, suggested_wait)
 
-                            # Return synthetic successful response in OpenAI format
-                            return {
-                                "choices": [{
-                                    "index": 0,
-                                    "message": {
-                                        "role": "assistant",
-                                        "content": None,
-                                        "tool_calls": recovered_calls
-                                    },
-                                    "finish_reason": "tool_calls"
-                                }],
-                                "usage": {
-                                    "prompt_tokens": 0,  # Unknown - Groq didn't return usage
-                                    "completion_tokens": 0,
-                                    "total_tokens": 0
-                                },
-                                "model": self.model,
-                                "_lenient_parse": True,  # Flag for tracking/debugging
-                                "_original_error": failed_gen  # Keep for debugging
-                            }
+                    # Track retry
+                    self.retry_count += 1
 
-                # Lenient parsing disabled or failed - raise error
-                if is_tool_failure:
-                    failed_gen = error_obj.get("failed_generation", "Not provided")
-
-                    # Build helpful error message
-                    hint_msg = (
-                        "Some models (especially 8b) may wrap JSON in XML tags.\n"
-                        "      Use natural language prompts instead of explicit commands:\n"
-                        "      ✅ 'I need to understand the code structure'\n"
-                        "      ❌ 'Use the reveal_structure tool on /path'"
-                    )
-
-                    if self.lenient_tool_parsing:
-                        hint_msg += "\n      Lenient parsing attempted but failed."
+                    # If this is not the last attempt, wait and retry
+                    if attempt < self.max_retries - 1:
+                        error_msg = error_data.get('error', {}).get('message', 'Rate limit exceeded')
+                        print(f"⚠️  Rate limit hit (attempt {attempt + 1}/{self.max_retries}): {error_msg}")
+                        print(f"   Waiting {wait_time:.1f}s before retry...")
+                        time.sleep(wait_time)
+                        continue  # Retry
                     else:
-                        hint_msg += "\n      Lenient parsing is disabled. Enable with lenient_tool_parsing=True"
+                        # Last attempt - raise error
+                        raise RuntimeError(
+                            f"Rate limit exceeded after {self.max_retries} attempts. "
+                            f"Error: {error_data.get('error', {}).get('message', 'Unknown')}"
+                        )
 
-                    raise RuntimeError(
-                        f"Groq API error (400): tool_use_failed\n"
-                        f"Model '{self.model}' generated malformed tool call format.\n"
-                        f"Generated: {failed_gen}\n"
-                        f"Hint: {hint_msg}"
+                # Enhanced error handling for tool_use_failed (400 errors)
+                if response.status_code == 400:
+                    error_obj = error_data.get("error", {})
+                    error_message = error_obj.get("message", "Unknown error")
+
+                    # Check for tool use failures
+                    is_tool_failure = (
+                        "tool_use_failed" in error_message.lower() or
+                        error_obj.get("failed_generation")
                     )
 
-            # Generic error fallback
-            raise RuntimeError(f"Groq API error ({response.status_code}): {error_data}")
+                    if is_tool_failure and self.lenient_tool_parsing:
+                        failed_gen = error_obj.get("failed_generation", "")
+                        tools = payload.get("tools", [])
 
-        return response.json()
+                        # Attempt lenient parsing
+                        if failed_gen and tools:
+                            recovered_calls = self._attempt_lenient_tool_parse(failed_gen, tools)
+
+                            if recovered_calls:
+                                # SUCCESS: Recovery worked!
+                                self.lenient_parse_count += 1
+
+                                # Return synthetic successful response in OpenAI format
+                                return {
+                                    "choices": [{
+                                        "index": 0,
+                                        "message": {
+                                            "role": "assistant",
+                                            "content": None,
+                                            "tool_calls": recovered_calls
+                                        },
+                                        "finish_reason": "tool_calls"
+                                    }],
+                                    "usage": {
+                                        "prompt_tokens": 0,  # Unknown - Groq didn't return usage
+                                        "completion_tokens": 0,
+                                        "total_tokens": 0
+                                    },
+                                    "model": self.model,
+                                    "_lenient_parse": True,  # Flag for tracking/debugging
+                                    "_original_error": failed_gen  # Keep for debugging
+                                }
+
+                    # Lenient parsing disabled or failed - raise error
+                    if is_tool_failure:
+                        failed_gen = error_obj.get("failed_generation", "Not provided")
+
+                        # Build helpful error message
+                        hint_msg = (
+                            "Some models (especially 8b) may wrap JSON in XML tags.\n"
+                            "      Use natural language prompts instead of explicit commands:\n"
+                            "      ✅ 'I need to understand the code structure'\n"
+                            "      ❌ 'Use the reveal_structure tool on /path'"
+                        )
+
+                        if self.lenient_tool_parsing:
+                            hint_msg += "\n      Lenient parsing attempted but failed."
+                        else:
+                            hint_msg += "\n      Lenient parsing is disabled. Enable with lenient_tool_parsing=True"
+
+                        raise RuntimeError(
+                            f"Groq API error (400): tool_use_failed\n"
+                            f"Model '{self.model}' generated malformed tool call format.\n"
+                            f"Generated: {failed_gen}\n"
+                            f"Hint: {hint_msg}"
+                        )
+
+                # Generic error fallback for non-retryable errors
+                raise RuntimeError(f"Groq API error ({response.status_code}): {error_data}")
+
+            # Success - return response
+            return response.json()
+
+        # Should never reach here due to exception raises, but for safety
+        raise RuntimeError("Unexpected error in _call_api retry loop")
 
     def _build_headers(self) -> Dict[str, str]:
         return {
