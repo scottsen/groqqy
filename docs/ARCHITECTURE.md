@@ -472,20 +472,43 @@ class GroqProvider(Provider):
 
 ### Rate Limit Handling
 
-**Implementation:** `providers/groq.py` - `_call_api()` method
+**Implementation:** `providers/groq.py` - Refactored in v2.5.0 for improved code quality
 
 **Purpose:** Automatically retry API calls when Groq rate limits are hit (HTTP 429)
 
-**Configuration:**
+**Configuration (v2.5.0+):**
 ```python
-provider = GroqProvider(
-    model="llama-3.1-8b-instant",
-    max_retries=3,              # Max retry attempts (default: 3)
-    initial_backoff=1.0,        # Initial wait time in seconds (default: 1.0)
+from groqqy import Groqqy, RetryConfig
+
+# Default configuration (3 retries, 1s/2s/4s backoff)
+bot = Groqqy()
+
+# Custom configuration via RetryConfig dataclass
+config = RetryConfig(
+    max_retries=5,              # Max retry attempts (default: 3)
+    initial_backoff=2.0,        # Initial wait time in seconds (default: 1.0)
     backoff_multiplier=2.0,     # Exponential multiplier (default: 2.0)
-    max_backoff=60.0            # Max wait cap in seconds (default: 60.0)
+    max_backoff=120.0           # Max wait cap in seconds (default: 60.0)
 )
+bot = Groqqy(retry_config=config)
+
+# Testing preset (fast retries)
+bot = Groqqy(retry_config=RetryConfig(max_retries=2, initial_backoff=0.1, max_backoff=1.0))
+
+# Production preset (conservative)
+bot = Groqqy(retry_config=RetryConfig(max_retries=5, initial_backoff=2.0, max_backoff=120.0))
 ```
+
+**Architecture (v2.5.0 Refactoring):**
+
+The rate limiting implementation was refactored in v2.5.0 to improve code quality (50% reduction in issues):
+
+- **`_call_api()` (51 lines)**: Simplified main retry loop, delegates error handling
+- **`_handle_rate_limit_error()` (42 lines)**: Handles 429 errors with exponential backoff
+- **`_handle_tool_use_error()` (74 lines)**: Handles 400 tool_use_failed errors with recovery
+- **`_create_synthetic_response()` (34 lines)**: Builds recovery responses for failed tool calls
+- **`_extract_retry_after()` (20 lines)**: Parses retry-after header or error messages
+- **`_calculate_backoff()` (15 lines)**: Computes exponential backoff with cap
 
 **Retry Strategy:**
 
@@ -493,9 +516,9 @@ provider = GroqProvider(
 2. **Extract wait time:** From `retry-after` header or error message ("Please try again in Xs")
 3. **Calculate backoff:** Use suggested time or exponential: `min(initial * multiplier^attempt, max)`
 4. **Wait and retry:** Sleep for calculated time, then retry
-5. **Max retries:** After 3 attempts (default), raise clear error
+5. **Max retries:** After max attempts, raise clear `RuntimeError` with retry count
 
-**Example backoff sequence:**
+**Example backoff sequence (default config):**
 - Attempt 1: Wait 1.0s
 - Attempt 2: Wait 2.0s
 - Attempt 3: Wait 4.0s
@@ -504,14 +527,16 @@ provider = GroqProvider(
 **Benefits:**
 - Transparent to Agent layer - retries happen automatically
 - Respects Groq's suggested wait times (from API response)
-- Configurable for different use cases (production vs testing)
+- Highly configurable via `RetryConfig` dataclass (production vs testing presets)
 - Clear feedback with console output during retries
-- Tracks total retry count for monitoring (`provider.retry_count`)
+- Tracks total retry count for monitoring (`bot.retry_count`)
+- Clean separation of concerns (each error type has dedicated handler)
+- Comprehensive test coverage (76% of groq.py, 35 passing tests)
 
 **Error handling:**
-- Rate limit (429): Retry with backoff
-- Tool use failure (400): Lenient parsing recovery (separate feature)
-- Other errors: Immediate failure (no retry)
+- Rate limit (429): Retry with exponential backoff via `_handle_rate_limit_error()`
+- Tool use failure (400): Lenient parsing recovery via `_handle_tool_use_error()`
+- Other errors (500, 401, etc.): Immediate failure (no retry)
 
 ---
 

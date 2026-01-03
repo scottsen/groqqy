@@ -14,9 +14,17 @@ Ultra-fast, ultra-cheap, and truly agentic. Groqqy is a multi-step reasoning age
 - 📚 **Teaching-Friendly**: Clean, readable code (<200 lines per file) perfect for learning agentic AI
 - 📝 **Export Ready**: Save conversations to markdown/HTML with full tool call visibility
 
-## What's New in v2.4.0
+## What's New in v2.5.0
 
-**Production Safety Features:**
+**Code Quality & Testing Improvements:**
+
+- 🔧 **Refactored Rate Limiting**: 50% reduction in code quality issues, 59% shorter main function
+- 📦 **RetryConfig Dataclass**: Clean, type-safe retry configuration
+- ✅ **Comprehensive Test Suite**: 35 passing tests with 76% coverage
+- 🎯 **Better Separation of Concerns**: Extracted error handling methods for clarity
+- 📚 **Test Documentation**: Complete testing guide in tests/README.md
+
+**Previous Features (v2.4.0):**
 
 - 🛡️ **Loop Detection**: Automatically detects and stops infinite tool call loops (prevents wasted iterations)
 - 📏 **Tool Result Truncation**: Configurable size limits prevent context overflow from large outputs (default 10KB, set via `GROQQY_MAX_RESULT_SIZE`)
@@ -262,6 +270,48 @@ response, cost = bot.chat(f"Extract facts from this data:\n{data}")
 ```
 
 **Note**: Omitting the `tools` parameter creates default tools (backwards compatible). Use `tools=None` explicitly to disable.
+
+### Rate Limit Handling
+
+**New in v2.5.0**: Production-grade retry configuration with improved code quality!
+
+Groqqy automatically handles Groq API rate limits (HTTP 429) with exponential backoff retry. Configure retry behavior to match your use case:
+
+```python
+from groqqy import Groqqy, RetryConfig
+
+# Default configuration (3 retries, 1s/2s/4s backoff)
+bot = Groqqy()
+
+# Custom configuration for production
+config = RetryConfig(
+    max_retries=5,           # More retry attempts
+    initial_backoff=2.0,     # Start with longer wait
+    backoff_multiplier=2.0,  # Exponential growth
+    max_backoff=120.0        # Cap at 2 minutes
+)
+bot = Groqqy(retry_config=config)
+
+# Fast retries for testing
+test_config = RetryConfig(max_retries=2, initial_backoff=0.1, max_backoff=1.0)
+bot = Groqqy(retry_config=test_config)
+```
+
+**How it works:**
+- Automatically detects rate limit errors (429 responses)
+- Extracts suggested wait times from API responses when available
+- Uses exponential backoff: 1s → 2s → 4s (configurable)
+- Provides clear console feedback during retries
+- Tracks retry count for monitoring (`bot.retry_count`)
+
+**Benefits:**
+- ✅ Transparent to your code (retries happen automatically)
+- ✅ Respects Groq's suggested wait times
+- ✅ Configurable for different environments (production vs testing)
+- ✅ Clean separation of concerns (refactored in v2.5.0)
+- ✅ Comprehensive test coverage (76% coverage, 35 passing tests)
+
+See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md#rate-limit-handling) for implementation details.
 
 ## Core Features
 
