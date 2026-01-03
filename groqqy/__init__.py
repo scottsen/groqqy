@@ -9,6 +9,9 @@ __version__ = "2.4.0"
 # Main bot
 from .bot import Groqqy
 
+# Configuration
+from .providers.groq import RetryConfig
+
 # Tool system
 from .tool import Tool, ToolRegistry, tool, create_default_registry
 
@@ -33,6 +36,7 @@ from .tools import read_file, run_command, search_files, search_content
 __all__ = [
     # Main API
     "Groqqy",
+    "RetryConfig",
 
     # Tool system
     "Tool",

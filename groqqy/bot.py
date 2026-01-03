@@ -10,7 +10,7 @@ Clean API over composable components:
 import uuid
 from typing import Optional, List, Dict, Any
 
-from .providers.groq import GroqProvider
+from .providers.groq import GroqProvider, RetryConfig
 from .agent import Agent
 from .tool import ToolRegistry, create_default_registry
 from .log import get_logger
@@ -43,27 +43,21 @@ class Groqqy:
         top_p: float = 0.65,
         lenient_tool_parsing: bool = True,
         debug_dir: Optional[str] = None,
-        max_retries: int = 3,
-        initial_backoff: float = 1.0,
-        backoff_multiplier: float = 2.0,
-        max_backoff: float = 60.0
+        retry_config: Optional[RetryConfig] = None
     ):
         """
         Initialize Groqqy.
 
         Args:
             model: Groq model name
-            tools: ToolRegistry, None to disable tools, or omit for defaults
-            system_instruction: Custom system prompt (uses default if not provided)
+            tools: ToolRegistry, None to disable, or omit for defaults
+            system_instruction: Custom system prompt
             max_iterations: Maximum agent loop iterations
-            temperature: Sampling temperature (0.0-2.0, default 0.5 for tool calling)
-            top_p: Nucleus sampling parameter (0.0-1.0, default 0.65 for tool calling)
-            lenient_tool_parsing: Enable automatic recovery from malformed tool calls (default True)
-            debug_dir: Directory for failure state dumps (defaults to ./logs/debug if not provided)
-            max_retries: Maximum retry attempts for rate limit errors (default 3)
-            initial_backoff: Initial backoff time in seconds for retries (default 1.0)
-            backoff_multiplier: Exponential backoff multiplier (default 2.0)
-            max_backoff: Maximum backoff time in seconds (default 60.0)
+            temperature: Sampling temperature (0.0-2.0)
+            top_p: Nucleus sampling parameter (0.0-1.0)
+            lenient_tool_parsing: Auto-recover from malformed tool calls
+            debug_dir: Directory for failure state dumps
+            retry_config: Rate limit retry configuration (uses defaults if None)
         """
         # Session tracking
         self.session_id = str(uuid.uuid4())[:8]
@@ -79,10 +73,7 @@ class Groqqy:
             temperature=temperature,
             top_p=top_p,
             lenient_tool_parsing=lenient_tool_parsing,
-            max_retries=max_retries,
-            initial_backoff=initial_backoff,
-            backoff_multiplier=backoff_multiplier,
-            max_backoff=max_backoff
+            retry_config=retry_config
         )
 
         # Tool registry (distinguish None from omitted for backwards compat)
